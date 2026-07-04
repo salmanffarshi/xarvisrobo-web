@@ -150,3 +150,66 @@ here. Never delete old ones — mark them superseded instead.
 **Tradeoff:** No one-command `shadcn add`. Slightly more manual work per component, and we must keep an eye on component source staying compatible with our pinned versions. Acceptable — it's the only path that honors the locked new-york/slate choice, and the components are stable, well-known source files.
 
 **Revisit if:** shadcn ships a CLI path that can target new-york/slate against a working registry again, or the team decides to adopt the v4 preset model (which would supersede this ADR and require updating CLAUDE.md's locked style/base-color).
+
+---
+
+## ADR-013: Single Auth.js instance with role-based routing (not two isolated instances)
+
+**Date:** 2026-07 (Phase A.4)
+
+**Decision:** One Auth.js v5 instance handles both customer and admin authentication.
+Two `Credentials` providers within the same instance:
+
+- `customer-credentials` — authorize only if user's role is `CUSTOMER`
+- `admin-credentials` — authorize only if user's role is any staff role
+  (`ADMIN`, `MANAGER`, `ENGINEER`, `QC`, `SUPPORT`) AND `isActive` is true
+
+One session cookie, one session store (database strategy via Prisma adapter).
+The session record carries `role` and `id`. Access control enforced by middleware
++ layout guards that read `session.user.role`.
+
+This **partially supersedes ADR-002**'s wording about "two isolated Auth.js
+providers." ADR-002's security intent (a customer session can never perform
+an admin action) is fully preserved. What changes is the implementation:
+one instance, two providers within it, strict role-based routing.
+
+**Why not two truly-isolated Auth.js instances:**
+- Auth.js v5 has no first-class support for running two instances in one app.
+  Getting two configs to coexist requires custom cookie handling, custom
+  adapter wiring, and hand-written session callbacks. That is exactly the
+  kind of custom auth code where security bugs live.
+- The isolation benefit (customer cookie *cannot reach* admin routes because
+  the cookie name differs) is defense-in-depth on top of the actual security
+  boundary (server-side role check). Adding the defense-in-depth layer here
+  costs us significant custom-code surface for marginal gain.
+- Well-trodden path > clever path for beginners on a real project.
+
+**Why role-based routing works:**
+- Every `/admin/*` request runs through middleware verifying the session
+  role is NOT `CUSTOMER`. Missing/wrong role → redirect to `/admin/login`.
+- Every `/account/*` request verifies the role IS `CUSTOMER`. Wrong role
+  → redirect to `/admin` (or `/admin/login` if unauthenticated).
+- Customer login form calls `signIn("customer-credentials", …)` — the
+  provider's `authorize` refuses non-customer users.
+- Admin login form calls `signIn("admin-credentials", …)` — the provider's
+  `authorize` refuses customers and refuses inactive staff.
+- Layout components ALSO check role as a second gate. Middleware is coarse
+  (edge runtime, limited APIs); layouts are precise (full Node runtime).
+
+**How the isolation is maintained in practice:**
+- Session cookie is signed with `AUTH_SECRET`; role can't be tampered with client-side.
+- With database sessions, the source of truth for role is the DB row, not the
+  cookie payload. Change the role in DB → next request reflects it.
+- Any admin action re-fetches the current session and re-validates role at the
+  service-function level, not just at the route boundary.
+
+**Tradeoff accepted:** Slightly weaker "belt" (one cookie for both contexts)
+in exchange for far simpler implementation and standard patterns. The
+"suspenders" (server-side role enforcement) do the real security work.
+
+**Revisit if:**
+- We ever need a customer and a staff member to hold overlapping simultaneous
+  sessions in the same browser (currently impossible — one cookie).
+- Auth.js releases first-class multi-instance support.
+- A concrete threat model emerges that role-based routing does not defend
+  against but cookie isolation would.
