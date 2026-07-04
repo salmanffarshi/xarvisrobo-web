@@ -1,0 +1,12 @@
+// Xarvisrobo — Prisma schema
+// Phase A.2: generator + datasource only. Models are added in Phase A.3.
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}

@@ -120,7 +120,7 @@ If Salman asks for one of these, remind him it was scoped out of v1 and confirm 
 Update this list as each phase completes. Also append a one-line note to `docs/progress.md`.
 
 - [x] Phase A.1 — scaffold Next.js + TS + Tailwind + shadcn/ui + git + GitHub — 2026-07-04 — scaffolded
-- [ ] Phase A.2 — install Prisma + Auth.js + supporting packages, wire up Neon
+- [x] Phase A.2 — install Prisma + Auth.js + supporting packages, wire up Neon — 2026-07-04 — Prisma + Auth.js installed, Neon connected
 - [ ] Phase A.3 — drop in schema, run first migration
 - [ ] Phase A.4 — Auth.js providers (customer + admin), base layouts, folder structure
 - [ ] Phase B — public pages + customer accounts + product catalog
