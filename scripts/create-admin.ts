@@ -24,72 +24,80 @@ import {
 
 const STAFF_ROLES = ["ADMIN", "MANAGER", "ENGINEER", "QC", "SUPPORT"] as const;
 
-/** Ask a question and return the typed answer (echoed normally). */
-function prompt(query: string): Promise<string> {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
+// A single readline interface for the whole session. We consume its `line`
+// events through a queue rather than calling `rl.question` sequentially: when
+// stdin is piped, readline emits buffered lines faster than sequential
+// questions can register handlers, and the extra lines would be lost. The queue
+// decouples line arrival from prompt timing, so it works interactively AND when
+// scripted/piped.
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
+
+// readline's private echo hook isn't in the public types; we narrow to this
+// shape to mask hidden prompts (suppress the echo of typed characters).
+interface MutableInterface extends readline.Interface {
+  _writeToOutput?(stringToWrite: string): void;
+}
+
+const lineQueue: string[] = [];
+let pendingResolve: ((line: string) => void) | null = null;
+let inputClosed = false;
+
+rl.on("line", (line) => {
+  if (pendingResolve) {
+    const resolve = pendingResolve;
+    pendingResolve = null;
+    resolve(line);
+  } else {
+    lineQueue.push(line);
+  }
+});
+rl.on("close", () => {
+  inputClosed = true;
+  if (pendingResolve) {
+    const resolve = pendingResolve;
+    pendingResolve = null;
+    resolve("");
+  }
+});
+
+function nextLine(): Promise<string> {
+  const buffered = lineQueue.shift();
+  if (buffered !== undefined) return Promise.resolve(buffered);
+  if (inputClosed) return Promise.resolve("");
   return new Promise((resolve) => {
-    rl.question(query, (answer) => {
-      rl.close();
-      resolve(answer);
-    });
+    pendingResolve = resolve;
   });
 }
 
-/** Ask a question with the typed characters masked as asterisks. */
-function promptHidden(query: string): Promise<string> {
-  const stdin = process.stdin;
-  const stdout = process.stdout;
+/** Ask a question and return the typed answer (echoed normally). */
+function prompt(query: string): Promise<string> {
+  process.stdout.write(query);
+  return nextLine();
+}
 
-  if (!stdin.isTTY) {
-    // Non-interactive (piped) input: fall back to a normal line read so the
-    // script still works in scripted contexts.
-    return prompt(query);
-  }
+/**
+ * Ask a question with the typed input hidden (echo suppressed, like `sudo`).
+ * Interactive: mutes character echo. Piped: no echo to mute anyway.
+ */
+async function promptHidden(query: string): Promise<string> {
+  process.stdout.write(query);
 
-  return new Promise((resolve, reject) => {
-    stdout.write(query);
-    stdin.setRawMode(true);
-    stdin.resume();
-    stdin.setEncoding("utf8");
+  const rlm = rl as MutableInterface;
+  const originalWrite = rlm._writeToOutput?.bind(rlm);
+  rlm._writeToOutput = (stringToWrite: string) => {
+    if (stringToWrite.includes("\n") || stringToWrite.includes("\r")) {
+      originalWrite?.(stringToWrite);
+    }
+  };
 
-    let input = "";
-    const onData = (chunk: string) => {
-      for (const char of chunk) {
-        switch (char) {
-          case "\n":
-          case "\r":
-          case "\u0004": // Ctrl-D
-            stdin.setRawMode(false);
-            stdin.pause();
-            stdin.removeListener("data", onData);
-            stdout.write("\n");
-            resolve(input);
-            return;
-          case "\u0003": // Ctrl-C
-            stdin.setRawMode(false);
-            stdin.pause();
-            stdin.removeListener("data", onData);
-            stdout.write("\n");
-            reject(new Error("Cancelled."));
-            return;
-          case "\u007f": // Backspace / Delete
-          case "\b":
-            if (input.length > 0) {
-              input = input.slice(0, -1);
-              stdout.write("\b \b");
-            }
-            break;
-          default:
-            input += char;
-            stdout.write("*");
-        }
-      }
-    };
-    stdin.on("data", onData);
-  });
+  const line = await nextLine();
+
+  if (originalWrite) rlm._writeToOutput = originalWrite;
+  process.stdout.write("\n");
+  return line;
 }
 
 /** Prompt repeatedly until the answer passes the given schema. */
@@ -149,7 +157,7 @@ async function main() {
     roleSchema
   );
 
-  // Password + confirmation, both masked. Re-ask until they match.
+  // Password + confirmation, both hidden. Re-ask until they match.
   let password: string;
   for (;;) {
     password = await promptValidated("Password: ", passwordSchema, {
@@ -190,7 +198,9 @@ async function main() {
       const target = error.meta?.target;
       const field =
         Array.isArray(target) && target.includes("phone") ? "phone" : "email";
-      console.error(`\n  ✗ That ${field} is already in use. No account created.\n`);
+      console.error(
+        `\n  ✗ That ${field} is already in use. No account created.\n`
+      );
       process.exitCode = 1;
       return;
     }
@@ -206,5 +216,6 @@ main()
     process.exitCode = 1;
   })
   .finally(async () => {
+    rl.close();
     await db.$disconnect();
   });
