@@ -5,22 +5,34 @@
 // `authorize` function plus server-side role checks (middleware + layouts),
 // NOT cookie isolation.
 //
-// Session strategy is "database" (Decision 3): the session token in the cookie
-// is only a lookup key; the authoritative `role`/`id` live in the DB. If a role
-// changes in the DB, the next request reflects it.
+// Session strategy is "jwt" (ADR-014, superseding the DB-sessions part of
+// ADR-013 / Decision 3). Auth.js v5's Credentials provider only supports JWT
+// sessions — database strategy throws `UnsupportedStrategy` at runtime. With
+// JWT, `id` and `role` ride inside the signed cookie, so edge middleware can
+// read them with no DB call. The security intent is preserved by (a) an
+// `isActive` re-check in the jwt callback on the Node runtime, and (b) role
+// re-validation at the service layer for sensitive actions (ADR-013).
 
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 
+import type { UserRole } from "@prisma/client";
 import { db } from "@/lib/db";
 import { customerLoginSchema, adminLoginSchema } from "@/lib/validations/auth";
 import { isStaff } from "@/lib/permissions";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // The Prisma adapter still manages the User and Account tables. Only the
+  // Session table goes unused under JWT strategy (kept in the schema for now).
   adapter: PrismaAdapter(db),
-  session: { strategy: "database" },
+  session: {
+    // 30 days is the hard cap for the signed JWT cookie. Staff sessions are
+    // expired earlier (8h) via the role-based `expiresAt` in the jwt callback.
+    strategy: "jwt",
+    maxAge: 60 * 60 * 24 * 30,
+  },
   pages: {
     // Customer-facing sign-in page. Admin login uses its own page and a
     // hard-coded redirect flow, so it does not rely on this setting.
@@ -107,12 +119,58 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    // With database sessions the callback receives the DB-backed `user`.
-    // We copy id + role onto `session.user` so `session.user.role` is available
-    // everywhere (typed via src/types/next-auth.d.ts).
-    session: ({ session, user }) => {
-      session.user.id = user.id;
-      session.user.role = user.role;
+    // Runs on sign-in and on every subsequent request that resolves the
+    // session (including edge middleware). Under JWT strategy this is where
+    // identity + role live and where we enforce expiry / deactivation.
+    jwt: async ({ token, user }) => {
+      // ── Sign-in: `user` comes from a provider's authorize(). ──
+      if (user) {
+        token.id = user.id;
+        token.role = user.role;
+        // Role-based absolute expiry: staff sessions are short-lived (8h),
+        // customer sessions long-lived (30d).
+        const EIGHT_HOURS_MS = 60 * 60 * 8 * 1000;
+        const THIRTY_DAYS_MS = 60 * 60 * 24 * 30 * 1000;
+        token.expiresAt =
+          Date.now() + (user.role !== "CUSTOMER" ? EIGHT_HOURS_MS : THIRTY_DAYS_MS);
+        return token;
+      }
+
+      // ── Subsequent requests: `user` is absent. ──
+      // 1. Enforce the role-based expiry we stamped above.
+      if (typeof token.expiresAt === "number" && Date.now() > token.expiresAt) {
+        return null; // expired → Auth.js invalidates the session
+      }
+
+      // 2. Re-check the account is still active. This needs a DB read, which
+      //    cannot run on the Edge runtime (middleware). We therefore skip it on
+      //    edge and let the Node-runtime layouts/services enforce isActive.
+      //    `token.id` is `unknown` on the base JWT type — guard it to a string.
+      if (process.env.NEXT_RUNTIME !== "edge" && typeof token.id === "string") {
+        const dbUser = await db.user.findUnique({
+          where: { id: token.id },
+          select: { isActive: true, role: true },
+        });
+        if (!dbUser || !dbUser.isActive) {
+          return null; // deactivated or deleted → invalidate
+        }
+        // Keep role fresh if an admin changed it mid-session.
+        token.role = dbUser.role;
+      }
+
+      return token;
+    },
+
+    // Copy id + role from the token onto `session.user` so `session.user.role`
+    // is available everywhere. The custom token fields read back as `unknown`
+    // (see the note in src/types/next-auth.d.ts), so we guard them.
+    session: ({ session, token }) => {
+      if (typeof token.id === "string") {
+        session.user.id = token.id;
+      }
+      if (typeof token.role === "string") {
+        session.user.role = token.role as UserRole;
+      }
       return session;
     },
   },

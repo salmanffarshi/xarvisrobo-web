@@ -25,11 +25,19 @@ declare module "next-auth" {
   }
 
   /**
-   * The shape of the user object returned by the Prisma adapter and passed to
-   * the `session` callback. Augmenting it lets the callback read `user.role`
-   * without a cast.
+   * The shape of the user object returned by a provider's `authorize()` and
+   * passed to the `jwt` callback on sign-in. Augmenting it lets the callback
+   * read `user.role` without a cast.
    */
   interface User {
     role: UserRole;
   }
 }
+
+// NOTE ON THE JWT TOKEN: Under JWT strategy we also store `id`, `role`, and
+// `expiresAt` on the token. We deliberately do NOT augment the `JWT` interface
+// here: it is declared in `@auth/core/jwt` (a transitive dep that pnpm does not
+// expose at the project root), so a `declare module` for it does not merge —
+// it would create a separate ambient module instead. The `JWT` interface
+// already has a `Record<string, unknown>` index signature, so the callbacks in
+// src/auth.ts read those custom fields back with `typeof` type guards.
