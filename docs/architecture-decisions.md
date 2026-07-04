@@ -213,3 +213,112 @@ in exchange for far simpler implementation and standard patterns. The
 - Auth.js releases first-class multi-instance support.
 - A concrete threat model emerges that role-based routing does not defend
   against but cookie isolation would.
+
+---
+
+## ADR-014: JWT session strategy for Auth.js Credentials (supersedes DB-sessions decision in ADR-013)
+
+**Date:** 2026-07 (mid-Phase A.4)
+
+**Decision:** Auth.js v5 is configured with `session: { strategy: "jwt" }`.
+This **reverses** the "database sessions" portion of ADR-013 / Phase A.4
+Decision 3. All other A.4 decisions (single Auth.js instance, two Credentials
+providers, role-based routing, NIST-modern passwords, CLI admin creation)
+remain in force unchanged.
+
+**Why the reversal was necessary (not preference — technical constraint):**
+
+Auth.js v5's `@auth/core` throws a hard `UnsupportedStrategy` error at runtime
+whenever the `Credentials` provider is combined with `strategy: "database"`.
+The message is unambiguous: "Signing in with credentials only supported if
+JWT strategy is enabled." This is an architectural assertion in the library,
+not a warning or a soft failure — the app is non-functional under our
+originally-intended configuration.
+
+We proved this empirically during Phase A.4 Step 4 by shipping the config
+exactly as ADR-013 specified. Build passed. Runtime failed on every
+`auth()` call. Unauthenticated `GET /admin` slipped through the middleware
+gate (returning 404 instead of the expected redirect) because `req.auth`
+came back as a truthy-but-empty object under the failed assertion, silently
+bypassing the role check.
+
+Workarounds considered:
+
+1. **Custom encode/decode for Credentials with DB sessions.** Requires
+   hand-written cryptographic session code — exactly the "custom auth code
+   where security bugs live" that ADR-013 explicitly warns against. Also
+   does not solve the edge-middleware problem below.
+2. **Node-runtime middleware.** Would allow Prisma calls from middleware,
+   but is still experimental in Next.js 15 and would require the split
+   `auth.config.ts` pattern that our A.4 prompt forbids.
+3. **Rip out Auth.js, roll our own with iron-session or lucia-auth.**
+   Massive scope creep mid-phase. `lucia-auth` is being deprecated by
+   its own maintainer. Not a viable path.
+
+None of the workarounds beats the mainstream JWT path on either security
+or maintainability.
+
+**What we lose vs. DB sessions:**
+
+- Instant server-side revocation by deleting a row. Under JWT, a compromised
+  session remains valid until the token expires or a token-invalidation
+  mechanism kicks in.
+
+**What we preserve (the security intent of Decision 3):**
+
+The original reason for choosing DB sessions was the ability to instantly
+kick out a compromised admin. Under JWT, we achieve substantially the same
+guarantee through three mechanisms enforced together:
+
+1. **Role-differentiated JWT `maxAge`.** Customer tokens live 30 days
+   (Auth.js default). Admin tokens live **8 hours**. Enforced in the
+   `jwt` callback: if `token.role !== "CUSTOMER"`, set a shorter
+   expiration. Worst-case exposure of a stolen admin token is 8 hours.
+
+2. **Service-layer re-validation of `isActive`.** Every sensitive admin
+   action re-fetches the user from the DB inside the service function
+   (per architecture principle 4) and checks `user.isActive`. Setting
+   `isActive = false` on a compromised admin causes their very next
+   action to fail. This was already an ADR-013 requirement; ADR-014
+   makes it load-bearing.
+
+3. **`isActive` check on JWT refresh.** Inside the `jwt` callback, on
+   every token refresh (`trigger === "update"` or expiration-triggered
+   refresh), look up the user's current `isActive`. If false, invalidate
+   the token. Belt on top of the service-layer suspenders.
+
+The net result: an admin whose account is disabled cannot perform any
+admin action after that disable is committed to the DB, even if their
+token has time left on it. The window between "we notice compromise" and
+"attacker is locked out" is one request, not "until token natural expiry."
+
+**What we lose vs. JWT-default (accepting we're on JWT):**
+
+- We do not get the "audit trail of active sessions" that a `Session`
+  table would give us. This is a Phase F+ concern (session listing UI),
+  and if we need it later we can add a separate `ActiveSession` model
+  tracked by the JWT `jti`.
+
+**Session content (JWT payload):**
+
+- `id` (string) — user id
+- `role` (UserRole enum) — for edge middleware routing
+- `name`, `email` — for UI
+
+Everything else stays in the DB and is fetched by services when needed.
+
+**Middleware implication:**
+
+Edge middleware reads `req.auth` (Auth.js-decoded JWT), which now contains
+role directly. No DB call needed at the edge. This resolves the second
+wall Claude Code identified during A.4 Step 5 — role-based routing works
+on the edge without Node runtime or split configs.
+
+**Revisit if:**
+
+- Auth.js v5 (or v6) ships first-class Credentials + DB sessions support.
+- We hit a real incident where the 8-hour admin token window costs us
+  materially more than what the service-layer + `isActive` guards
+  prevent — in which case we'd add a `tokenVersion` field on User and
+  bump-to-invalidate all outstanding tokens for that user.
+- We adopt a passwordless / OAuth flow that plays better with DB sessions.
