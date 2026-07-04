@@ -58,7 +58,10 @@ export const registerSchema = z.object({
   name: nameSchema,
   email: emailSchema,
   password: passwordSchema,
-  // Optional at registration; `.optional()` allows the field to be omitted.
+  // Optional at registration. Kept as a plain optional so the schema's input
+  // and output types match exactly (react-hook-form's zod resolver typing needs
+  // that). The register form maps an empty phone input to `undefined` in the
+  // field's onChange, so a blank optional phone never reaches this regex.
   phone: phoneSchema.optional(),
 });
 
