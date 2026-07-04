@@ -1,6 +1,15 @@
-// Xarvisrobo — Prisma schema
-// Phase A.2: generator + datasource only. Models are added in Phase A.3.
-// Docs: https://pris.ly/d/prisma-schema
+// ============================================================================
+// XARVISROBO - PRISMA SCHEMA
+// ============================================================================
+// Production data model for the Xarvisrobo e-commerce + manufacturing system.
+//
+// Design principles:
+//   1. Historical orders never mutate (JSON snapshots for product & address)
+//   2. Customer-facing order status is separate from internal manufacturing
+//   3. Role-based access from day 1 (future roles pre-defined)
+//   4. Every mutation has an audit trail (OrderStatusHistory)
+//   5. Reusable by future mobile app via /api/v1/*
+// ============================================================================
 
 generator client {
   provider = "prisma-client-js"
@@ -9,4 +18,441 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+  MANAGER
+  ENGINEER
+  QC
+  SUPPORT
+}
+
+enum PaymentMethod {
+  BKASH
+  NAGAD
+  BANK
+  COD
+}
+
+enum PaymentStatus {
+  PENDING // waiting on admin
+  VERIFIED // admin confirmed payment received
+  REJECTED // admin rejected (wrong txn, amount mismatch, etc.)
+  INFO_REQUESTED // admin needs more info from customer
+}
+
+// Customer-facing statuses only. Internal manufacturing stages live on the
+// Manufacturing model and are never exposed to customers.
+enum OrderStatus {
+  AWAITING_PAYMENT_VERIFICATION // bKash/Nagad/Bank orders start here
+  PAYMENT_VERIFIED // admin approved payment
+  CONFIRMED // COD orders start here; production queue entered
+  IN_PRODUCTION // any manufacturing stage before READY_TO_SHIP
+  SHIPPED // handed to courier
+  DELIVERED // customer received
+  CANCELLED // terminal, reason stored
+}
+
+enum ManufacturingStatus {
+  WAITING_FOR_PRODUCTION
+  COMPONENTS_COLLECTED
+  ASSEMBLY
+  FIRMWARE_INSTALLED
+  TESTING
+  QC
+  PACKAGING
+  READY_TO_SHIP
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  IN_APP
+}
+
+// ============================================================================
+// USER & AUTH
+// ============================================================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  phone         String?   @unique
+  passwordHash  String?
+  emailVerified DateTime?
+  name          String
+  role          UserRole  @default(CUSTOMER)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  addresses             Address[]
+  cart                  Cart?
+  orders                Order[]              @relation("CustomerOrders")
+  verifiedPayments      Payment[]            @relation("VerifiedByAdmin")
+  statusChanges         OrderStatusHistory[] @relation("ChangedByUser")
+  authoredNotes         CustomerNote[]       @relation("NoteAuthor")
+  notesAboutMe          CustomerNote[]       @relation("NoteSubject")
+  assignedManufacturing Manufacturing[]      @relation("AssignedEngineer")
+  notifications         Notification[]
+  sessions              Session[]
+  accounts              Account[]
+
+  @@index([role])
+  @@index([email])
+}
+
+// ---- Auth.js (NextAuth v5) required models ----------------------------------
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expires   DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+// ============================================================================
+// ADDRESS
+// ============================================================================
+
+model Address {
+  id            String   @id @default(cuid())
+  userId        String
+  label         String // "Home", "Office", etc.
+  recipientName String
+  phone         String
+  streetAddress String
+  city          String
+  district      String
+  postalCode    String
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ============================================================================
+// CATALOG
+// ============================================================================
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  imageUrl    String?
+  parentId    String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+  products Product[]
+
+  @@index([slug])
+  @@index([parentId])
+}
+
+model Product {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  sku              String   @unique
+  shortDescription String?
+  description      String   @db.Text
+  categoryId       String
+  basePrice        Decimal  @db.Decimal(10, 2)
+  stockQuantity    Int      @default(0)
+  isActive         Boolean  @default(true)
+  isFeatured       Boolean  @default(false)
+  // Flexible schema for varying robot specs (voice model, screen, sensors, etc.)
+  specifications   Json?
+  metaTitle        String?
+  metaDescription  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  category   Category       @relation(fields: [categoryId], references: [id])
+  images     ProductImage[]
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  @@index([slug])
+  @@index([categoryId])
+  @@index([isActive, isFeatured])
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  url       String
+  altText   String?
+  sortOrder Int      @default(0)
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+// ============================================================================
+// CART
+// ============================================================================
+
+model Cart {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+}
+
+model CartItem {
+  id            String   @id @default(cuid())
+  cartId        String
+  productId     String
+  quantity      Int
+  // Locks price at add-time so cart totals don't jump if product price changes
+  priceSnapshot Decimal  @db.Decimal(10, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([cartId, productId])
+  @@index([cartId])
+}
+
+// ============================================================================
+// ORDER
+// ============================================================================
+
+model Order {
+  id             String        @id @default(cuid())
+  orderNumber    String        @unique // Human-readable: XR-2026-0001
+  userId         String
+  status         OrderStatus   @default(AWAITING_PAYMENT_VERIFICATION)
+  paymentMethod  PaymentMethod
+  subtotal       Decimal       @db.Decimal(10, 2)
+  deliveryCharge Decimal       @default(0) @db.Decimal(10, 2) // 130 BDT for COD
+  total          Decimal       @db.Decimal(10, 2)
+  currency       String        @default("BDT")
+
+  // JSON snapshot of the shipping address so historical orders don't change
+  // if the user later edits or deletes their Address record.
+  // Shape: { recipientName, phone, streetAddress, city, district, postalCode }
+  shippingAddress Json
+
+  contactPhone  String
+  deliveryNotes String?
+
+  cancelledAt  DateTime?
+  cancelReason String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user          User                 @relation("CustomerOrders", fields: [userId], references: [id])
+  items         OrderItem[]
+  payment       Payment?
+  manufacturing Manufacturing?
+  statusHistory OrderStatusHistory[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([orderNumber])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id              String  @id @default(cuid())
+  orderId         String
+  productId       String
+  // JSON snapshot: { name, sku, specifications } at purchase time.
+  // Product records may change, but historical order lines must not.
+  productSnapshot Json
+  quantity        Int
+  unitPrice       Decimal @db.Decimal(10, 2)
+  lineTotal       Decimal @db.Decimal(10, 2)
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+}
+
+// Full audit trail for order status changes. Every status change goes here.
+model OrderStatusHistory {
+  id          String       @id @default(cuid())
+  orderId     String
+  fromStatus  OrderStatus?
+  toStatus    OrderStatus
+  changedById String
+  note        String?
+  createdAt   DateTime     @default(now())
+
+  order     Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  changedBy User  @relation("ChangedByUser", fields: [changedById], references: [id])
+
+  @@index([orderId])
+}
+
+// ============================================================================
+// PAYMENT
+// ============================================================================
+
+model Payment {
+  id              String        @id @default(cuid())
+  orderId         String        @unique
+  method          PaymentMethod
+  // The next 4 are null for COD, required for bKash/Nagad/Bank.
+  transactionId   String?
+  senderNumber    String?
+  paidAmount      Decimal?      @db.Decimal(10, 2)
+  screenshotUrl   String?
+  status          PaymentStatus @default(PENDING)
+  verifiedById    String?
+  verifiedAt      DateTime?
+  rejectionReason String?
+  adminNotes      String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  order      Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  verifiedBy User? @relation("VerifiedByAdmin", fields: [verifiedById], references: [id])
+
+  @@index([status])
+  @@index([orderId])
+}
+
+// ============================================================================
+// MANUFACTURING (internal only, never exposed to customers)
+// ============================================================================
+
+model Manufacturing {
+  id             String              @id @default(cuid())
+  orderId        String              @unique
+  internalStatus ManufacturingStatus @default(WAITING_FOR_PRODUCTION)
+  assignedToId   String? // typically an ENGINEER role
+  startedAt      DateTime?
+  completedAt    DateTime?
+  notes          String?             @db.Text
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  order      Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  assignedTo User? @relation("AssignedEngineer", fields: [assignedToId], references: [id])
+
+  @@index([internalStatus])
+  @@index([assignedToId])
+}
+
+// ============================================================================
+// CUSTOMER NOTES (admin-only internal notes on a customer)
+// ============================================================================
+
+model CustomerNote {
+  id         String   @id @default(cuid())
+  customerId String
+  authorId   String
+  content    String   @db.Text
+  createdAt  DateTime @default(now())
+
+  customer User @relation("NoteSubject", fields: [customerId], references: [id], onDelete: Cascade)
+  author   User @relation("NoteAuthor", fields: [authorId], references: [id])
+
+  @@index([customerId])
+}
+
+// ============================================================================
+// NOTIFICATIONS
+// ============================================================================
+
+model Notification {
+  id        String              @id @default(cuid())
+  userId    String
+  type      String // "PAYMENT_VERIFIED", "ORDER_SHIPPED", etc.
+  title     String
+  body      String              @db.Text
+  channel   NotificationChannel
+  metadata  Json? // links, order ids, etc.
+  readAt    DateTime?
+  sentAt    DateTime?
+  createdAt DateTime            @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([channel])
+}
+
+// ============================================================================
+// CONTACT / SUPPORT (from public Contact form)
+// ============================================================================
+
+model ContactMessage {
+  id         String   @id @default(cuid())
+  name       String
+  email      String
+  phone      String?
+  subject    String
+  message    String   @db.Text
+  isResolved Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([isResolved])
 }

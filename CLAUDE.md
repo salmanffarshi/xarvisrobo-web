@@ -121,7 +121,7 @@ Update this list as each phase completes. Also append a one-line note to `docs/p
 
 - [x] Phase A.1 — scaffold Next.js + TS + Tailwind + shadcn/ui + git + GitHub — 2026-07-04 — scaffolded
 - [x] Phase A.2 — install Prisma + Auth.js + supporting packages, wire up Neon — 2026-07-04 — Prisma + Auth.js installed, Neon connected
-- [ ] Phase A.3 — drop in schema, run first migration
+- [x] Phase A.3 — drop in schema, run first migration — 2026-07-04 — full schema in place, first migration run, Prisma client generated
 - [ ] Phase A.4 — Auth.js providers (customer + admin), base layouts, folder structure
 - [ ] Phase B — public pages + customer accounts + product catalog
 - [ ] Phase C — cart + checkout
