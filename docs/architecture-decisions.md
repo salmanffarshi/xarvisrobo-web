@@ -132,3 +132,21 @@ here. Never delete old ones — mark them superseded instead.
 - Lowest latency to Bangladesh among Neon's available regions.
 - Neon's serverless-first architecture matches Vercel's cold-start model.
 - Free tier is enough for early production; scaling is a pricing change, not a migration.
+
+---
+
+## ADR-012: shadcn/ui set up manually (CLI incompatible with current registry)
+
+**Decision:** The shadcn/ui pieces in this project — `components.json`, `src/lib/utils.ts`, the theme in `src/app/globals.css`, and every `src/components/ui/*` component — are added and maintained **by hand**, not via the `shadcn` CLI. New components are added by copying their source into `src/components/ui/` and installing any missing dependencies with `pnpm add`.
+
+**Why (discovered during Phase A.1, 2026-07-04):**
+- CLAUDE.md locks shadcn/ui to the **new-york** style + **slate** base color.
+- The current shadcn CLI is **v4.x**, which replaced the classic init with a new "templates + presets" model (default preset `base-nova`, Radix vs Base UI primitives). It no longer exposes `new-york` / `slate` — using it would silently substitute a different design system.
+- Pinning to the classic **`shadcn@2`** CLI *does* accept `--base-color slate` (new-york is its default) and correctly wrote `components.json`, but its `init` / `add` then fail against shadcn's **live registry** with `Validation failed: - css: Invalid input` — the registry's response schema has moved past what the v2 CLI can parse. Pinning the CLI version doesn't help when the registry it depends on has moved on.
+- Neither the latest nor the pinned-classic CLI can complete the setup. Writing the files by hand produces the *identical* new-york/slate result and is fully deterministic.
+
+**How to add a component later:** copy the component's source file(s) into `src/components/ui/`, then `pnpm add` any new dependencies it imports. `components.json` stays the source of truth for style/alias config. Dependencies already installed in A.1: `class-variance-authority`, `clsx`, `tailwind-merge`, `lucide-react`, `@radix-ui/react-slot`, `tw-animate-css`.
+
+**Tradeoff:** No one-command `shadcn add`. Slightly more manual work per component, and we must keep an eye on component source staying compatible with our pinned versions. Acceptable — it's the only path that honors the locked new-york/slate choice, and the components are stable, well-known source files.
+
+**Revisit if:** shadcn ships a CLI path that can target new-york/slate against a working registry again, or the team decides to adopt the v4 preset model (which would supersede this ADR and require updating CLAUDE.md's locked style/base-color).
