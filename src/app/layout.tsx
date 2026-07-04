@@ -14,9 +14,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Xarvisrobo",
+  // PLACEHOLDER DOMAIN — no domain is registered yet. Once one exists, move
+  // this to an env var (e.g. NEXT_PUBLIC_SITE_URL) so preview/prod differ.
+  metadataBase: new URL("https://xarvisrobo.com"),
+  title: {
+    default: "Xarvisrobo",
+    template: "%s | Xarvisrobo",
+  },
   description:
-    "AI-enabled desk robots — customer store and internal dashboard.",
+    "Xarvisrobo builds intelligent desk companions — designed in Bangladesh, built for everyone.",
 };
 
 export default function RootLayout({
