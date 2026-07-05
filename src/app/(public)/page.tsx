@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Cpu, HeartHandshake, Puzzle } from "lucide-react";
 
+import { ProductCard } from "@/components/product/product-card";
 import { Button } from "@/components/ui/button";
+import * as productService from "@/services/product-service";
 
 export const metadata: Metadata = {
   description:
@@ -36,7 +38,9 @@ const PILLARS = [
   },
 ] as const;
 
-export default function HomePage() {
+export default async function HomePage() {
+  const featured = await productService.listFeatured(4);
+
   return (
     <>
       {/* Hero — text-only with a very subtle radial glow behind the content. */}
@@ -92,6 +96,27 @@ export default function HomePage() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Featured products */}
+      <section className="mx-auto max-w-6xl px-6 py-24 sm:py-32">
+        <h2 className="text-3xl font-semibold tracking-tight text-neutral-900 md:text-4xl">
+          The robots we&rsquo;re building.
+        </h2>
+        <p className="mt-4 text-lg text-neutral-600">
+          Two designs, one philosophy — small, capable, made in Bangladesh.
+        </p>
+        <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:gap-8">
+          {featured.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
+        <Link
+          href="/products"
+          className="mt-8 inline-block text-sm text-neutral-600 underline-offset-4 hover:underline"
+        >
+          See all robots →
+        </Link>
       </section>
 
       {/* Closing CTA */}
