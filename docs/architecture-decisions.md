@@ -322,3 +322,15 @@ on the edge without Node runtime or split configs.
   prevent — in which case we'd add a `tokenVersion` field on User and
   bump-to-invalidate all outstanding tokens for that user.
 - We adopt a passwordless / OAuth flow that plays better with DB sessions.
+
+---
+
+## Known Issue — Product.specifications key order
+
+Postgres jsonb does not preserve object key order. During B.2 we noticed
+the specs table renders keys in whatever order Postgres returns them,
+not the order they were seeded. Fix (deferred to Phase E when admin
+product UI is built): migrate Product.specifications from Json to a
+structured array of { label: string; value: string }[]. This lets admins
+reorder specs, and the render order is deterministic. Not urgent — the
+current display is functional, just not sequenced.
