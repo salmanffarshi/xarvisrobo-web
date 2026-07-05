@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn } from "next-auth/react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
+import { mergeGuestCartOnAuth } from "@/lib/cart/merge-on-auth";
 import { registerSchema, type RegisterInput } from "@/lib/validations/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,6 +71,10 @@ export default function RegisterPage() {
         );
         return;
       }
+
+      // Fold any guest (localStorage) cart into the new account's cart before
+      // the redirect — best-effort, never blocks the registration.
+      await mergeGuestCartOnAuth();
 
       router.push("/account");
       router.refresh();

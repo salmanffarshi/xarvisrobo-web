@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn } from "next-auth/react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
+import { mergeGuestCartOnAuth } from "@/lib/cart/merge-on-auth";
 import {
   customerLoginSchema,
   type CustomerLoginInput,
@@ -51,6 +52,9 @@ export default function LoginPage() {
     });
 
     if (result?.ok) {
+      // Fold any guest (localStorage) cart into the account's cart before the
+      // redirect — best-effort, never blocks the login.
+      await mergeGuestCartOnAuth();
       router.push("/account");
       router.refresh();
     } else {
