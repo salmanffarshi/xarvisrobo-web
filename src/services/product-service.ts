@@ -200,6 +200,20 @@ export async function getBySlug(slug: string): Promise<ProductDetail | null> {
   };
 }
 
+/**
+ * Active products among the given ids — for guest-cart hydration (the guest
+ * cart stores only productIds; prices/names are always fetched live, ADR-005).
+ * Inactive or nonexistent ids are simply omitted from the result.
+ */
+export async function listByIds(ids: string[]): Promise<ProductCard[]> {
+  if (ids.length === 0) return [];
+  const rows = await db.product.findMany({
+    where: { id: { in: ids }, isActive: true },
+    select: cardSelect,
+  });
+  return rows.map(toCard);
+}
+
 /** Featured + active products for the home page, newest first. */
 export async function listFeatured(limit = 4): Promise<ProductCard[]> {
   const rows = await db.product.findMany({
