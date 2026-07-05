@@ -125,7 +125,8 @@ Update this list as each phase completes. Also append a one-line note to `docs/p
 - [x] Phase A.3 — drop in schema, run first migration — 2026-07-04 — full schema in place, first migration run, Prisma client generated
 - [x] Phase A.4 — 2026-07-04 — Auth.js configured (JWT strategy per ADR-014), middleware live, register + login + admin-login pages, create-admin CLI, all flows verified
 - [x] Phase B.1 — 2026-07-04 — public pages, contact form working, SEO basics, auth-aware nav
-- [ ] Phase B (remaining: B.2 catalog, B.3 customer accounts)
+- [x] Phase B.2 — 2026-07-05 — catalog live: 2 products seeded, list + detail pages, service + API layer, featured products on home, SVG placeholders
+- [ ] Phase B (remaining: B.3 customer accounts)
 - [ ] Phase C — cart + checkout
 - [ ] Phase D — payments + customer dashboard
 - [ ] Phase E — admin dashboard (products, payments, orders, customers, manufacturing)
