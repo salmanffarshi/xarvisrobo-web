@@ -6,6 +6,8 @@ Format: `YYYY-MM-DD — Phase X.Y — what was done`
 
 ---
 
+2026-07-05 — Phase B.3 — customer account area: sidebar/tabs layout, overview, profile edit, change-password, full address CRUD with default handling and ownership checks, /api/v1/me/* endpoints, account-service + address-service. Phase B complete. 22/22 E2E checks green (browser-driven via headless Chrome + curl ownership probe: customer B fetching customer A's address id → 404, no data leak). Test users cleaned up.
+
 2026-07-05 — Phase B.2 — product catalog: seeded 2 desk robots + 2 categories, product-service + category-service, /api/v1/products + /api/v1/categories + /api/v1/products/[slug], /products list page with URL-based search/filter/sort/pagination, /products/[slug] detail with SVG placeholder hero, featured products section on home, sitemap includes products. 25/25 end-to-end checks green (20 browser-driven via headless Chrome + API/SEO curl checks).
 
 2026-07-04 — Phase B.1 — public marketing pages (home, about, FAQ, warranty, privacy, T&C), contact form + API + service, design system foundation (Geist + brand blue + premium minimalist tokens), SEO basics (metadata, robots, sitemap), auth-aware nav. 25/25 automated checks green; all test rows cleaned up (DB has 0 users).
