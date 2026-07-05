@@ -265,7 +265,8 @@ model CartItem {
   cartId        String
   productId     String
   quantity      Int
-  // Locks price at add-time so cart totals don't jump if product price changes
+  // Add-time price, informational only — cart math always uses the live
+  // Product.basePrice (ADR-015); authoritative pricing happens at order time
   priceSnapshot Decimal  @db.Decimal(10, 2)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

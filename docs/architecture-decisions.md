@@ -325,6 +325,22 @@ on the edge without Node runtime or split configs.
 
 ---
 
+## ADR-015: Cart uses live product prices; priceSnapshot is informational
+
+**Date:** 2026-07 (Phase C.1)
+
+Cart line totals and subtotal are always computed from the current
+`Product.basePrice` at read time, not from `CartItem.priceSnapshot`. The
+snapshot records the price when the item was added (useful later for "price
+changed since you added this" UX), but is not authoritative for cart math.
+Authoritative pricing for an actual order is computed at order-placement time
+in Phase C.2 (per ADR-005), snapshotting into OrderItem at that moment. This
+keeps the cart honest about current prices while preserving a record of
+add-time price. Tradeoff: a price change is reflected immediately in an
+existing cart, which is the expected e-commerce behavior.
+
+---
+
 ## Known Issue — Product.specifications key order
 
 Postgres jsonb does not preserve object key order. During B.2 we noticed
