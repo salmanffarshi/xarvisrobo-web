@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
+import { ProductCardAddButton } from "@/components/product/product-card-add-button";
 import { RobotPlaceholder } from "@/components/product/robot-placeholder";
 import { formatBdt } from "@/lib/format";
 import type { ProductCard as ProductCardData } from "@/services/product-service";
@@ -38,6 +39,9 @@ export function ProductCard({ product }: { product: ProductCardData }) {
           <span className="text-xs text-neutral-500">
             {product.stockQuantity > 0 ? "In stock" : "Pre-order"}
           </span>
+        </div>
+        <div className="mt-4">
+          <ProductCardAddButton productId={product.id} />
         </div>
       </div>
     </Link>

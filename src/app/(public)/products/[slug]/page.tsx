@@ -89,7 +89,7 @@ export default async function ProductDetailPage({ params }: Props) {
           </Badge>
 
           <div className="mt-8">
-            <AddToCartButton />
+            <AddToCartButton productId={product.id} />
             <p className="mt-4 text-sm text-neutral-600">
               Questions about this robot?{" "}
               <Link

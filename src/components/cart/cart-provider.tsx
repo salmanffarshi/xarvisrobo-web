@@ -42,7 +42,8 @@ type CartContextValue = CartView & {
   isOpen: boolean;
   openCart: () => void;
   closeCart: () => void;
-  addItem: (productId: string, quantity: number) => Promise<void>;
+  /** Resolves true on success — callers use this to show "Added to cart". */
+  addItem: (productId: string, quantity: number) => Promise<boolean>;
   /** target = itemId when signed in, productId for guests (line.itemId ?? line.productId). */
   updateItem: (target: string, quantity: number) => Promise<void>;
   removeItem: (target: string) => Promise<void>;
@@ -189,8 +190,10 @@ export function CartProvider({
         await refreshGuestView(guestCart.addToGuestCart(productId, quantity));
       }
       if (wouldExceedCap) capToast();
+      return true;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not add to cart");
+      return false;
     }
   };
 
