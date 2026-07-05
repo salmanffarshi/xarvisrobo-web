@@ -7,14 +7,21 @@ type RobotPlaceholderProps = {
   variant?: "card" | "hero";
 };
 
-// djb2-xor string hash — deterministic, so the same slug always renders
-// the same hue + silhouette across server renders and deploys.
+// djb2-xor string hash with a murmur3-style avalanche finalizer —
+// deterministic, so the same slug always renders the same hue + silhouette.
+// The finalizer matters: without it, near-identical slugs like "xarvis-d1"
+// vs "xarvis-d2" hash 1 apart and get the same silhouette + hue.
 function hashSlug(slug: string): number {
   let hash = 5381;
   for (let i = 0; i < slug.length; i++) {
     hash = (Math.imul(hash, 33) ^ slug.charCodeAt(i)) >>> 0;
   }
-  return hash;
+  hash ^= hash >>> 16;
+  hash = Math.imul(hash, 0x85ebca6b) >>> 0;
+  hash ^= hash >>> 13;
+  hash = Math.imul(hash, 0xc2b2ae35) >>> 0;
+  hash ^= hash >>> 16;
+  return hash >>> 0;
 }
 
 const BODY_FILL = "#262626";
