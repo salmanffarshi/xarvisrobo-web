@@ -1,3 +1,4 @@
+import { CartDrawer } from "@/components/cart/cart-drawer";
 import { CartProviderServer } from "@/components/cart/cart-provider-server";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
@@ -18,6 +19,7 @@ export default function PublicLayout({
         <main className="flex-1">{children}</main>
         <SiteFooter />
       </div>
+      <CartDrawer />
     </CartProviderServer>
   );
 }

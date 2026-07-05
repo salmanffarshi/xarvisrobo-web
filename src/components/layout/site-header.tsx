@@ -3,6 +3,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { isCustomer } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
+import { CartButton } from "@/components/cart/cart-button";
 import { AccountMenu } from "@/components/layout/account-menu";
 import {
   MobileNav,
@@ -44,31 +45,35 @@ export async function SiteHeader() {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-3 md:flex">
-          {authState.status === "guest" && (
-            <>
-              <Link
-                href="/login"
-                className="text-sm text-neutral-600 transition-colors duration-200 hover:text-neutral-900"
-              >
-                Sign in
-              </Link>
-              <Button asChild size="sm" className="rounded-full px-4">
-                <Link href="/register">Get early access</Link>
-              </Button>
-            </>
-          )}
-          {authState.status === "customer" && (
-            <AccountMenu name={authState.name} />
-          )}
-          {authState.status === "staff" && (
-            <Button asChild size="sm" className="rounded-full px-4">
-              <Link href="/admin">Admin Panel</Link>
-            </Button>
-          )}
-        </div>
+        <div className="flex items-center gap-1 md:gap-3">
+          <CartButton />
 
-        <MobileNav authState={authState} />
+          <div className="hidden items-center gap-3 md:flex">
+            {authState.status === "guest" && (
+              <>
+                <Link
+                  href="/login"
+                  className="text-sm text-neutral-600 transition-colors duration-200 hover:text-neutral-900"
+                >
+                  Sign in
+                </Link>
+                <Button asChild size="sm" className="rounded-full px-4">
+                  <Link href="/register">Get early access</Link>
+                </Button>
+              </>
+            )}
+            {authState.status === "customer" && (
+              <AccountMenu name={authState.name} />
+            )}
+            {authState.status === "staff" && (
+              <Button asChild size="sm" className="rounded-full px-4">
+                <Link href="/admin">Admin Panel</Link>
+              </Button>
+            )}
+          </div>
+
+          <MobileNav authState={authState} />
+        </div>
       </div>
     </header>
   );
