@@ -33,6 +33,7 @@ export type ProductCard = {
   isFeatured: boolean;
   categoryName: string;
   stockQuantity: number;
+  updatedAt: Date;
 };
 
 export type ProductListResult = {
@@ -82,6 +83,7 @@ const cardSelect = {
   basePrice: true,
   isFeatured: true,
   stockQuantity: true,
+  updatedAt: true,
   category: { select: { name: true } },
 } satisfies Prisma.ProductSelect;
 

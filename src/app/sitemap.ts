@@ -1,9 +1,9 @@
 import type { MetadataRoute } from "next";
 
+import * as productService from "@/services/product-service";
+
 // Served at /sitemap.xml (Next.js Metadata Files API).
-// B.2 NOTE: when the product catalog ships, fetch active products here and
-// append their /products/[slug] URLs dynamically.
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // PLACEHOLDER DOMAIN — see layout.tsx metadataBase.
   const base = "https://xarvisrobo.com";
 
@@ -17,9 +17,21 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/terms", priority: 0.8 },
   ];
 
-  return staticPaths.map(({ path, priority }) => ({
-    url: `${base}${path}`,
-    changeFrequency: "monthly",
-    priority,
+  const staticEntries: MetadataRoute.Sitemap = staticPaths.map(
+    ({ path, priority }) => ({
+      url: `${base}${path}`,
+      changeFrequency: "monthly",
+      priority,
+    })
+  );
+
+  const { data: products } = await productService.list({ limit: 100 });
+  const productEntries: MetadataRoute.Sitemap = products.map((product) => ({
+    url: `${base}/products/${product.slug}`,
+    changeFrequency: "weekly",
+    priority: 0.7,
+    lastModified: product.updatedAt,
   }));
+
+  return [...staticEntries, ...productEntries];
 }
