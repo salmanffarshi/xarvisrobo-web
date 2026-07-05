@@ -128,7 +128,8 @@ Update this list as each phase completes. Also append a one-line note to `docs/p
 - [x] Phase B.2 — 2026-07-05 — catalog live: 2 products seeded, list + detail pages, service + API layer, featured products on home, SVG placeholders
 - [x] Phase B.3 — 2026-07-05 — customer account: profile, password change, addresses CRUD
 - [x] Phase B — complete (B.1 public pages, B.2 catalog, B.3 customer accounts)
-- [ ] Phase C — cart + checkout
+- [x] Phase C.1 — 2026-07-06 — cart: guest cart + merge on login, cart service/API, drawer, cart page, add-to-cart wired
+- [ ] Phase C — cart + checkout (C.2 checkout + order placement remaining)
 - [ ] Phase D — payments + customer dashboard
 - [ ] Phase E — admin dashboard (products, payments, orders, customers, manufacturing)
 - [ ] Phase F — notifications (email + SMS) + invoices
