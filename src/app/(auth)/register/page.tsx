@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,6 +9,7 @@ import { signIn } from "next-auth/react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 import { mergeGuestCartOnAuth } from "@/lib/cart/merge-on-auth";
+import { safeCallbackUrl } from "@/lib/safe-callback-url";
 import { registerSchema, type RegisterInput } from "@/lib/validations/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,8 +32,13 @@ import {
 } from "@/components/ui/form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  // Where to send the user after registering. A guest sent here from checkout
+  // carries ?callbackUrl=/checkout; anything unsafe falls back to /account
+  // (open-redirect guard — see src/lib/safe-callback-url.ts).
+  const searchParams = useSearchParams();
+  const callbackUrl = safeCallbackUrl(searchParams.get("callbackUrl"));
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -76,7 +82,7 @@ export default function RegisterPage() {
       // the redirect — best-effort, never blocks the registration.
       await mergeGuestCartOnAuth();
 
-      router.push("/account");
+      router.push(callbackUrl);
       router.refresh();
     } catch {
       setServerError(
@@ -225,7 +231,12 @@ export default function RegisterPage() {
         <p className="text-muted-foreground text-sm">
           Already have an account?{" "}
           <Link
-            href="/login"
+            // Preserve the return destination if the guest signs in instead.
+            href={
+              callbackUrl === "/account"
+                ? "/login"
+                : `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`
+            }
             className="text-foreground font-medium underline underline-offset-4"
           >
             Sign in
@@ -233,5 +244,15 @@ export default function RegisterPage() {
         </p>
       </CardFooter>
     </Card>
+  );
+}
+
+// useSearchParams() requires a Suspense boundary on statically prerendered
+// pages — without it, `next build` fails on this route.
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterForm />
+    </Suspense>
   );
 }
