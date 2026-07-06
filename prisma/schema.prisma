@@ -292,6 +292,8 @@ model Order {
   deliveryCharge Decimal       @default(0) @db.Decimal(10, 2) // 130 BDT for COD
   total          Decimal       @db.Decimal(10, 2)
   currency       String        @default("BDT")
+  // Set once at placement to dedupe double-submits.
+  idempotencyKey String?       @unique
 
   // JSON snapshot of the shipping address so historical orders don't change
   // if the user later edits or deletes their Address record.
