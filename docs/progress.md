@@ -6,6 +6,8 @@ Format: `YYYY-MM-DD — Phase X.Y — what was done`
 
 ---
 
+2026-07-06 — Phase C.2 — single-page checkout (login-gated, callbackUrl), transactional order placement (idempotent, server-recomputed totals, COD ৳130, address+product JSON snapshots, order number XR-YYYYMMDD-XXXXX, Payment+Manufacturing+OrderStatusHistory rows, cart cleared), order confirmation/detail page with per-method payment instructions, payment config. Phase C complete. 31/31 E2E checks green (13 browser-driven + 16 DB-state + 2 curl, incl. the four critical properties: idempotency replay → same order, snapshot immutability after address edit, server-side pricing, cross-customer ownership → 404). Test users cleaned up.
+
 2026-07-06 — Phase C.1 — cart complete: guest localStorage cart + merge-on-login, cart-service with ownership checks, /api/v1/cart/* + products/by-ids, unified cart provider, header badge + drawer, /cart page, add-to-cart wired on detail + cards, 5-per-item cap, live-price cart math (ADR-015). 17/17 E2E checks green (11 curl API checks + 16 browser-driven + curl ownership attack: customer B PATCH/DELETE on customer A's cart item id → 404, cart untouched). Test users cleaned up.
 
 2026-07-05 — Phase B.3 — customer account area: sidebar/tabs layout, overview, profile edit, change-password, full address CRUD with default handling and ownership checks, /api/v1/me/* endpoints, account-service + address-service. Phase B complete. 22/22 E2E checks green (browser-driven via headless Chrome + curl ownership probe: customer B fetching customer A's address id → 404, no data leak). Test users cleaned up.
