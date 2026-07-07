@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
-import type { OrderStatus } from "@prisma/client";
 
 import { auth } from "@/auth";
 import {
@@ -10,7 +9,10 @@ import {
   paymentReceivingDetails,
   type PrepaidMethod,
 } from "@/config/payment";
+import { DELIVERY_ZONE_LABELS } from "@/lib/delivery";
 import { formatBdt } from "@/lib/format";
+import { ORDER_STATUS_LABELS, statusTone } from "@/lib/order-status";
+import { cn } from "@/lib/utils";
 import { getOrderForCustomer } from "@/services/order-service";
 import type { OrderDetailView } from "@/types/order";
 import { Badge } from "@/components/ui/badge";
@@ -19,25 +21,25 @@ export const metadata: Metadata = {
   title: "Order details",
 };
 
-// Customer-facing status labels only — Manufacturing internals are staff-only
-// (ADR-006) and never appear on this page.
-const STATUS_LABELS: Record<OrderStatus, string> = {
-  AWAITING_PAYMENT_VERIFICATION: "Awaiting payment verification",
-  PAYMENT_VERIFIED: "Payment verified",
-  CONFIRMED: "Confirmed",
-  IN_PRODUCTION: "In production",
-  SHIPPED: "Shipped",
-  DELIVERED: "Delivered",
-  CANCELLED: "Cancelled",
+// Subtle badge coloring by tone, within the site's restrained palette.
+const TONE_CLASSES: Record<ReturnType<typeof statusTone>, string> = {
+  pending: "bg-amber-50 text-amber-700",
+  progress: "bg-blue-50 text-blue-700",
+  success: "bg-emerald-50 text-emerald-700",
+  terminal: "bg-neutral-100 text-neutral-600",
 };
 
 function PaymentInstructions({ order }: { order: OrderDetailView }) {
   if (order.paymentMethod === "COD") {
     return (
       <p className="text-sm text-neutral-600">
-        Pay {formatBdt(order.total)} in cash on delivery (includes{" "}
-        {formatBdt(order.deliveryCharge)} delivery). We&apos;ve started
-        preparing your order.
+        Your order is placed. Our team will call you at{" "}
+        <span className="font-medium text-neutral-900">
+          {order.contactPhone}
+        </span>{" "}
+        to confirm before we begin building your robot. Delivery charge{" "}
+        {formatBdt(order.deliveryCharge)} (
+        {DELIVERY_ZONE_LABELS[order.deliveryZone]}) is payable on delivery.
       </p>
     );
   }
@@ -95,8 +97,8 @@ function PaymentInstructions({ order }: { order: OrderDetailView }) {
       {details.instructions && <p>{details.instructions}</p>}
       <p>{paymentGeneralNote}</p>
       <p className="text-neutral-500">
-        You&apos;ll be able to submit your payment confirmation from your
-        account soon.
+        You&apos;ll be able to submit your payment details from your account
+        soon.
       </p>
     </div>
   );
@@ -152,8 +154,14 @@ export default async function OrderDetailPage({
           </h1>
           <p className="mt-1 text-sm text-neutral-500">Placed {orderDate}</p>
         </div>
-        <Badge variant="secondary" className="rounded-full px-3 py-1">
-          {STATUS_LABELS[order.status]}
+        <Badge
+          variant="secondary"
+          className={cn(
+            "rounded-full px-3 py-1",
+            TONE_CLASSES[statusTone(order.status)],
+          )}
+        >
+          {ORDER_STATUS_LABELS[order.status]}
         </Badge>
       </div>
 
@@ -187,7 +195,9 @@ export default async function OrderDetailPage({
             <div className="flex items-baseline justify-between">
               <span className="text-neutral-600">Delivery charge</span>
               <span className="tabular-nums">
-                {formatBdt(order.deliveryCharge)}
+                {order.deliveryCharge === "0.00"
+                  ? "Free"
+                  : formatBdt(order.deliveryCharge)}
               </span>
             </div>
             <div className="flex items-baseline justify-between border-t border-neutral-100 pt-3 font-medium">

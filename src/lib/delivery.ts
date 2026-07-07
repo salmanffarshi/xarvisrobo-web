@@ -15,6 +15,12 @@ import {
 } from "@/config/payment";
 import type { DeliveryZone, PaymentMethod } from "@prisma/client";
 
+/** Customer-facing zone labels, from the stored enum (ADR-016). */
+export const DELIVERY_ZONE_LABELS: Record<DeliveryZone, string> = {
+  INSIDE_DHAKA: "Inside Dhaka",
+  OUTSIDE_DHAKA: "Outside Dhaka",
+};
+
 /**
  * Delivery charge as a 2dp decimal string, from payment method + chosen zone:
  * - prepaid (BKASH/NAGAD/BANK) → "0.00" (free everywhere)
