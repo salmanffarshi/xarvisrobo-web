@@ -24,7 +24,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 
-import { COD_DELIVERY_CHARGE } from "@/config/payment";
+import { computeDeliveryCharge } from "@/lib/delivery";
 import { formatBdt } from "@/lib/format";
 import { sumMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -76,6 +76,23 @@ const PAYMENT_OPTIONS: {
   },
 ];
 
+const DELIVERY_ZONE_OPTIONS: {
+  value: PlaceOrderInput["deliveryZone"];
+  label: string;
+  descriptor: string;
+}[] = [
+  {
+    value: "INSIDE_DHAKA",
+    label: "Inside Dhaka",
+    descriptor: "Delivery within Dhaka city.",
+  },
+  {
+    value: "OUTSIDE_DHAKA",
+    label: "Outside Dhaka",
+    descriptor: "Anywhere else in Bangladesh.",
+  },
+];
+
 function SectionHeading({ step, title }: { step: number; title: string }) {
   return (
     <h2 className="flex items-center gap-3 font-medium tracking-tight text-neutral-900">
@@ -117,14 +134,18 @@ export function CheckoutForm({
       contactPhone: defaultAddress?.phone ?? profilePhone ?? "",
       deliveryNotes: "",
       paymentMethod: "BKASH",
+      deliveryZone: "INSIDE_DHAKA",
     },
   });
 
   const selectedAddressId = form.watch("addressId");
   const paymentMethod = form.watch("paymentMethod");
+  const deliveryZone = form.watch("deliveryZone");
 
-  const deliveryCharge =
-    paymentMethod === "COD" ? COD_DELIVERY_CHARGE.toFixed(2) : "0.00";
+  // Same helper the server uses at placement (ADR-016), so this displayed
+  // charge always matches what gets stored. Recomputes whenever the method or
+  // the zone radio changes.
+  const deliveryCharge = computeDeliveryCharge(paymentMethod, deliveryZone);
   const total = sumMoney([subtotal, deliveryCharge]);
 
   function selectAddress(address: AddressData) {
@@ -159,12 +180,14 @@ export function CheckoutForm({
           "Content-Type": "application/json",
           "Idempotency-Key": idempotencyKey,
         },
-        // No prices in the body — ever (ADR-005).
+        // No prices in the body — ever (ADR-005). The zone is a choice, not a
+        // price; the server computes the authoritative charge from it.
         body: JSON.stringify({
           addressId: values.addressId,
           contactPhone: values.contactPhone,
           deliveryNotes: values.deliveryNotes || undefined,
           paymentMethod: values.paymentMethod,
+          deliveryZone: values.deliveryZone,
         }),
       });
       const body: { orderNumber?: string; error?: { message?: string } } | null =
@@ -379,9 +402,65 @@ export function CheckoutForm({
                           )}
                         >
                           {isCod
-                            ? `+ ${formatBdt(COD_DELIVERY_CHARGE.toFixed(2))} delivery charge`
+                            ? `+ ${formatBdt(computeDeliveryCharge("COD", deliveryZone))} delivery charge`
                             : "Free delivery"}
                         </span>
+                      </span>
+                      <span className="mt-1 block text-neutral-600">
+                        {option.descriptor}
+                      </span>
+                      {isCod && (
+                        <span className="mt-1 block text-neutral-500">
+                          COD orders are confirmed by phone before we begin
+                          building.
+                        </span>
+                      )}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* Section 5 — delivery zone (always shown; drives the COD charge) */}
+          <section>
+            <SectionHeading step={5} title="Delivery zone" />
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {DELIVERY_ZONE_OPTIONS.map((option) => {
+                const selected = option.value === deliveryZone;
+                return (
+                  <label
+                    key={option.value}
+                    className={cn(
+                      "flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition-colors",
+                      selected
+                        ? "border-blue-600 ring-1 ring-blue-600"
+                        : "border-neutral-200 hover:border-neutral-300",
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="delivery-zone"
+                      className="sr-only"
+                      checked={selected}
+                      onChange={() =>
+                        form.setValue("deliveryZone", option.value)
+                      }
+                    />
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border",
+                        selected ? "border-blue-600" : "border-neutral-300",
+                      )}
+                    >
+                      {selected && (
+                        <span className="size-2 rounded-full bg-blue-600" />
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1 text-sm">
+                      <span className="font-medium text-neutral-900">
+                        {option.label}
                       </span>
                       <span className="mt-1 block text-neutral-600">
                         {option.descriptor}
@@ -427,7 +506,9 @@ export function CheckoutForm({
               <div className="flex items-baseline justify-between">
                 <span className="text-neutral-600">Delivery</span>
                 <span className="tabular-nums text-neutral-900">
-                  {paymentMethod === "COD" ? formatBdt(deliveryCharge) : "৳0"}
+                  {deliveryCharge === "0.00"
+                    ? "Free"
+                    : formatBdt(deliveryCharge)}
                 </span>
               </div>
               <div className="flex items-baseline justify-between border-t border-neutral-200 pt-3 font-medium">
