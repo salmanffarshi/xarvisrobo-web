@@ -3,7 +3,12 @@
 // Money is decimal-as-string on the wire; dates are ISO 8601 UTC strings.
 // Deliberately excludes Manufacturing internals — customers never see those.
 
-import type { OrderStatus, PaymentMethod, PaymentStatus } from "@prisma/client";
+import type {
+  DeliveryZone,
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+} from "@prisma/client";
 
 /** Order.shippingAddress JSON snapshot, frozen at placement time (ADR-004). */
 export type ShippingAddressSnapshot = {
@@ -30,6 +35,8 @@ export type OrderDetailView = {
   orderNumber: string;
   status: OrderStatus;
   paymentMethod: PaymentMethod;
+  /** Explicit zone chosen at checkout (ADR-016) — drives the delivery label. */
+  deliveryZone: DeliveryZone;
   subtotal: string;
   deliveryCharge: string;
   total: string;

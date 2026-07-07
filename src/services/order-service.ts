@@ -24,8 +24,8 @@
 
 import { Prisma, type OrderStatus } from "@prisma/client";
 
-import { COD_DELIVERY_CHARGE } from "@/config/payment";
 import { db } from "@/lib/db";
+import { computeDeliveryCharge } from "@/lib/delivery";
 import { multiplyMoney, sumMoney } from "@/lib/money";
 import { generateOrderNumber } from "@/lib/order-number";
 import {
@@ -156,17 +156,21 @@ export async function placeOrder(
           };
         });
         const subtotal = sumMoney(lines.map((line) => line.lineTotal));
-        const deliveryCharge =
-          parsed.paymentMethod === "COD"
-            ? COD_DELIVERY_CHARGE.toFixed(2)
-            : "0.00";
+        // Charge from method + the customer's chosen zone (ADR-016), via the
+        // same helper the checkout summary uses so display and stored agree.
+        const deliveryCharge = computeDeliveryCharge(
+          parsed.paymentMethod,
+          parsed.deliveryZone,
+        );
         const total = sumMoney([subtotal, deliveryCharge]);
 
-        // 5. COD needs no payment verification; prepaid waits for it.
+        // 5. Method-specific initial status (ADR-016): COD waits for a phone
+        //    confirmation; prepaid waits for payment. Neither enters production
+        //    here — that's a Phase E gate.
         const initialStatus: OrderStatus =
           parsed.paymentMethod === "COD"
-            ? "CONFIRMED"
-            : "AWAITING_PAYMENT_VERIFICATION";
+            ? "WAITING_FOR_ORDER_CONFIRMATION"
+            : "WAITING_FOR_PAYMENT";
 
         const shippingAddress: ShippingAddressSnapshot = {
           label: address.label,
@@ -178,16 +182,18 @@ export async function placeOrder(
           postalCode: address.postalCode,
         };
 
-        // 6.–10. Order + items + payment + manufacturing + history in one
-        // nested create. Payment starts PENDING for COD too (collected on
-        // delivery, admin marks it later); txn fields stay null until the
-        // Phase D proof upload.
+        // 6.–9. Order + items + payment + history in one nested create. NO
+        // Manufacturing row here (ADR-016) — it's created only at the Phase E
+        // production gate (payment verified / COD confirmed). Payment starts
+        // PENDING for every order (records the intent); txn fields stay null
+        // until the Phase D proof upload.
         const order = await tx.order.create({
           data: {
             orderNumber: candidateOrderNumber,
             userId,
             status: initialStatus,
             paymentMethod: parsed.paymentMethod,
+            deliveryZone: parsed.deliveryZone,
             subtotal,
             deliveryCharge,
             total,
@@ -212,9 +218,6 @@ export async function placeOrder(
             },
             payment: {
               create: { method: parsed.paymentMethod, status: "PENDING" },
-            },
-            manufacturing: {
-              create: { internalStatus: "WAITING_FOR_PRODUCTION" },
             },
             statusHistory: {
               create: {
@@ -283,6 +286,7 @@ export async function getOrderForCustomer(
     orderNumber: order.orderNumber,
     status: order.status,
     paymentMethod: order.paymentMethod,
+    deliveryZone: order.deliveryZone,
     subtotal: order.subtotal.toFixed(2),
     deliveryCharge: order.deliveryCharge.toFixed(2),
     total: order.total.toFixed(2),
