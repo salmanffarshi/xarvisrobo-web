@@ -350,3 +350,157 @@ product UI is built): migrate Product.specifications from Json to a
 structured array of { label: string; value: string }[]. This lets admins
 reorder specs, and the render order is deterministic. Not urgent — the
 current display is functional, just not sequenced.
+
+---
+
+## ADR-016: Revised order lifecycle — delivery matrix, COD confirmation gate, method-specific statuses, gated manufacturing
+
+**Date:** 2026-07 (Phase C.3 revision, after C.2 shipped)
+
+**Supersedes:** ADR-009's flat ৳130 COD charge, and the earlier rule that COD
+orders jump straight to CONFIRMED and into production at placement.
+
+This ADR redefines the canonical order flow based on real business rules for
+custom-built (build-to-order) products in Bangladesh.
+
+---
+
+### 1. Delivery charge (method + zone)
+
+Delivery zone is an EXPLICIT customer choice at checkout — a radio
+(Inside Dhaka / Outside Dhaka) shown for every order — NOT derived from the
+address district. Rationale: "Dhaka" is ambiguous (district vs city vs
+division; Savar/Keraniganj are Dhaka district but out-of-city for couriers),
+so an inferred rule is unreliable and high-maintenance. The customer knows
+their own delivery zone; a two-option radio is zero-maintenance and honest.
+
+The chosen zone is stored on every order (both prepaid and COD) as
+`Order.deliveryZone` (enum `INSIDE_DHAKA | OUTSIDE_DHAKA`), for records and
+future courier planning.
+
+Charge, computed server-side at placement from method + stored zone:
+- **Prepaid** (BKASH / NAGAD / BANK): FREE everywhere, regardless of zone.
+  Deliberate incentive to prefer prepaid.
+- **COD, Inside Dhaka**: ৳60.
+- **COD, Outside Dhaka**: ৳130.
+
+Charges live in `src/config/payment.ts`:
+`COD_DELIVERY_INSIDE_DHAKA = 60`, `COD_DELIVERY_OUTSIDE_DHAKA = 130`.
+Prepaid is implicitly 0. Admin-editable in Phase E.
+
+---
+
+### 2. COD confirmation gate
+
+Custom-built products are especially exposed to fake or refused COD orders, so
+a COD order does NOT enter production on placement. Flow:
+
+Customer places COD order → status **WAITING_FOR_ORDER_CONFIRMATION** → a
+representative phones the customer → customer confirms → admin marks status
+**ORDER_CONFIRMED** → manufacturing begins.
+
+No production work (no Manufacturing record) exists before ORDER_CONFIRMED.
+
+---
+
+### 3. Prepaid payment-verification gate
+
+A prepaid order does NOT enter production until payment is verified. Flow:
+
+Customer places order → status **WAITING_FOR_PAYMENT** → payment instructions
+shown (send to bKash/Nagad/bank, use order number as reference) → customer
+submits proof (txn id, method, sender number, optional screenshot) → status
+**WAITING_FOR_PAYMENT_VERIFICATION** → admin verifies → status
+**PAYMENT_VERIFIED** → manufacturing begins.
+
+No production work exists before PAYMENT_VERIFIED.
+
+---
+
+### 4. Customer-facing OrderStatus enum (new)
+
+```
+enum OrderStatus {
+  // Prepaid path
+  WAITING_FOR_PAYMENT
+  WAITING_FOR_PAYMENT_VERIFICATION
+  PAYMENT_VERIFIED
+  // COD path
+  WAITING_FOR_ORDER_CONFIRMATION
+  ORDER_CONFIRMED
+  // Shared tail
+  IN_PRODUCTION
+  SHIPPED
+  DELIVERED
+  // Terminal
+  CANCELLED
+}
+```
+
+Initial status at placement:
+- Prepaid → `WAITING_FOR_PAYMENT`
+- COD → `WAITING_FOR_ORDER_CONFIRMATION`
+
+Display labels (customer-facing):
+- WAITING_FOR_PAYMENT → "Waiting for Payment"
+- WAITING_FOR_PAYMENT_VERIFICATION → "Waiting for Payment Verification"
+- PAYMENT_VERIFIED → "Payment Verified"
+- WAITING_FOR_ORDER_CONFIRMATION → "Waiting for Order Confirmation"
+- ORDER_CONFIRMED → "Order Confirmed"
+- IN_PRODUCTION → "In Production"
+- SHIPPED → "Shipped"
+- DELIVERED → "Delivered"
+- CANCELLED → "Cancelled"
+
+Removed from the old enum: `AWAITING_PAYMENT_VERIFICATION`, `CONFIRMED`
+(replaced by the method-specific states above).
+
+---
+
+### 5. Manufacturing creation is gated
+
+The `Manufacturing` record is NOT created at order placement. It is created
+only when the production gate is passed:
+- Prepaid: when admin verifies payment (status → PAYMENT_VERIFIED).
+- COD: when the rep-confirmed order is marked ORDER_CONFIRMED.
+
+At creation it starts at `WAITING_FOR_PRODUCTION` (internal stage enum
+unchanged). The customer-facing status becomes `IN_PRODUCTION` when the admin
+actually starts production (a separate Phase E action) — manufacturing stage
+advancement still does not auto-advance customer status (retains the ADR-006
+split-status principle).
+
+`Payment` (status PENDING) IS still created at placement for every order
+(prepaid and COD alike) — it records the payment intent; only the Manufacturing
+row is deferred.
+
+---
+
+### Phase ownership of the transitions
+
+- **C.3 (this revision):** new enum + migration; placement sets the correct
+  initial status by method; district-aware delivery charge; placement no
+  longer creates a Manufacturing row; checkout + confirmation UI reflect the
+  new charges and statuses.
+- **Phase D:** customer submits payment proof → transitions WAITING_FOR_PAYMENT
+  → WAITING_FOR_PAYMENT_VERIFICATION.
+- **Phase E (admin):** verify payment → PAYMENT_VERIFIED (+ create Manufacturing);
+  phone-confirm COD → ORDER_CONFIRMED (+ create Manufacturing); start production
+  → IN_PRODUCTION; ship; deliver; cancel.
+
+---
+
+### Tradeoffs
+
+- More statuses = a slightly richer state machine, but each maps to a real
+  business step the customer and admin both understand.
+- Deferring Manufacturing creation means the production queue only ever
+  contains real, paid/confirmed work — no speculative rows for orders that
+  may be fake or unpaid.
+- Prepaid gets free delivery (a margin cost) in exchange for eliminating COD
+  risk and improving cash flow — a deliberate incentive.
+
+**Revisit if:** COD fraud drops enough to allow auto-confirmation for trusted
+repeat customers; or delivery-cost changes require per-courier / per-weight
+charges (would replace the flat inside/outside zone split); or we later want
+more than two zones (would extend the DeliveryZone enum + the radio).
