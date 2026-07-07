@@ -5,10 +5,12 @@
 // (Phase C.2). Single source of truth: the confirmation page reads from here,
 // and Phase E makes these admin-editable. These are public-facing (customers
 // must see them to pay) — they are not secrets, but keep them accurate.
-// The COD delivery charge is locked at 130 BDT per ADR-009.
+// COD delivery charge depends on the customer's chosen zone (ADR-016):
+// prepaid is free everywhere; COD is ৳60 inside Dhaka, ৳130 outside.
 
 export const CURRENCY = "BDT";
-export const COD_DELIVERY_CHARGE = 130; // ADR-009
+export const COD_DELIVERY_INSIDE_DHAKA = 60; // ADR-016
+export const COD_DELIVERY_OUTSIDE_DHAKA = 130; // ADR-016
 
 export type PrepaidMethod = "BKASH" | "NAGAD" | "BANK";
 
