@@ -50,13 +50,25 @@ enum PaymentStatus {
 // Customer-facing statuses only. Internal manufacturing stages live on the
 // Manufacturing model and are never exposed to customers.
 enum OrderStatus {
-  AWAITING_PAYMENT_VERIFICATION // bKash/Nagad/Bank orders start here
-  PAYMENT_VERIFIED // admin approved payment
-  CONFIRMED // COD orders start here; production queue entered
-  IN_PRODUCTION // any manufacturing stage before READY_TO_SHIP
+  // Prepaid path (bKash/Nagad/Bank)
+  WAITING_FOR_PAYMENT // prepaid orders start here
+  WAITING_FOR_PAYMENT_VERIFICATION // customer submitted payment proof (Phase D)
+  PAYMENT_VERIFIED // admin approved payment (Phase E) → manufacturing created
+  // COD path
+  WAITING_FOR_ORDER_CONFIRMATION // COD orders start here; rep phones to confirm
+  ORDER_CONFIRMED // COD confirmed by phone (Phase E) → manufacturing created
+  // Shared tail
+  IN_PRODUCTION // admin started production (Phase E)
   SHIPPED // handed to courier
   DELIVERED // customer received
   CANCELLED // terminal, reason stored
+}
+
+// Explicit customer choice at checkout — NOT derived from the address district
+// (ADR-016). Stored on every order for records + future courier planning.
+enum DeliveryZone {
+  INSIDE_DHAKA
+  OUTSIDE_DHAKA
 }
 
 enum ManufacturingStatus {
@@ -286,10 +298,11 @@ model Order {
   id             String        @id @default(cuid())
   orderNumber    String        @unique // Human-readable: XR-2026-0001
   userId         String
-  status         OrderStatus   @default(AWAITING_PAYMENT_VERIFICATION)
+  status         OrderStatus // always set explicitly at placement (ADR-016)
   paymentMethod  PaymentMethod
+  deliveryZone   DeliveryZone // explicit customer radio at checkout (ADR-016)
   subtotal       Decimal       @db.Decimal(10, 2)
-  deliveryCharge Decimal       @default(0) @db.Decimal(10, 2) // 130 BDT for COD
+  deliveryCharge Decimal       @default(0) @db.Decimal(10, 2) // COD: ৳60 inside / ৳130 outside; prepaid: 0
   total          Decimal       @db.Decimal(10, 2)
   currency       String        @default("BDT")
   // Set once at placement to dedupe double-submits.
