@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { getOrderForCustomer } from "@/services/order-service";
 import type { OrderDetailView } from "@/types/order";
 import { Badge } from "@/components/ui/badge";
+import { OrderStatusTracker } from "@/components/order/order-status-tracker";
 
 export const metadata: Metadata = {
   title: "Order details",
@@ -132,6 +133,13 @@ export default async function OrderDetailPage({
 
   return (
     <section>
+      <Link
+        href="/account/orders"
+        className="mb-6 inline-block text-sm text-neutral-600 underline-offset-4 transition-colors hover:text-neutral-900 hover:underline"
+      >
+        ← All orders
+      </Link>
+
       {placed === "1" && (
         <div className="mb-8 flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
           <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-600" />
@@ -166,6 +174,13 @@ export default async function OrderDetailPage({
       </div>
 
       <div className="mt-8 space-y-6">
+        {/* Status journey (Phase D.1) — method-aware; distinct treatment when
+            cancelled. Reads customer-facing status only (ADR-006). */}
+        <OrderStatusTracker
+          paymentMethod={order.paymentMethod}
+          status={order.status}
+        />
+
         {/* Items + totals */}
         <div className="rounded-2xl border border-neutral-200 p-6">
           <h2 className="text-sm font-medium text-neutral-500">Items</h2>
