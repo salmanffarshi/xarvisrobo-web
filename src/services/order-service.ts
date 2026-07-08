@@ -34,10 +34,15 @@ import {
 } from "@/lib/validations/order";
 import type {
   OrderDetailView,
+  OrderListResult,
+  OrderSummary,
   ShippingAddressSnapshot,
 } from "@/types/order";
 
 const MAX_ORDER_NUMBER_ATTEMPTS = 6;
+
+/** Per-page cap for the order-history list (ADR/API convention). */
+const ORDER_LIST_MAX_LIMIT = 50;
 
 /** Thrown when placing an order with an empty cart. Mapped to HTTP 400. */
 export class EmptyCartError extends Error {
@@ -260,6 +265,68 @@ export async function placeOrder(
   throw new Error(
     `Could not generate a unique order number after ${MAX_ORDER_NUMBER_ATTEMPTS} attempts`,
   );
+}
+
+/**
+ * List a customer's orders, newest first, paginated (Phase D.1). Scoped to
+ * `userId` — a customer only ever sees their own orders. Each summary carries
+ * just what the history card needs; Manufacturing internals are never
+ * included (ADR-006).
+ */
+export async function listForCustomer(
+  userId: string,
+  { page = 1, limit = 20 }: { page?: number; limit?: number } = {},
+): Promise<OrderListResult> {
+  const safeLimit = Math.min(Math.max(limit, 1), ORDER_LIST_MAX_LIMIT);
+  const safePage = Math.max(page, 1);
+
+  const [total, orders] = await Promise.all([
+    db.order.count({ where: { userId } }),
+    db.order.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      skip: (safePage - 1) * safeLimit,
+      take: safeLimit,
+      select: {
+        orderNumber: true,
+        createdAt: true,
+        status: true,
+        paymentMethod: true,
+        deliveryZone: true,
+        total: true,
+        items: {
+          orderBy: { id: "asc" },
+          select: { quantity: true, productSnapshot: true },
+        },
+      },
+    }),
+  ]);
+
+  const data: OrderSummary[] = orders.map((order) => {
+    const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
+    const firstSnapshot = order.items[0]?.productSnapshot as
+      | { name: string; slug: string }
+      | undefined;
+    return {
+      orderNumber: order.orderNumber,
+      createdAt: order.createdAt.toISOString(),
+      status: order.status,
+      paymentMethod: order.paymentMethod,
+      deliveryZone: order.deliveryZone,
+      total: order.total.toFixed(2),
+      itemCount,
+      firstItemName: firstSnapshot?.name ?? "",
+      firstItemSlug: firstSnapshot?.slug ?? "",
+    };
+  });
+
+  return {
+    data,
+    page: safePage,
+    limit: safeLimit,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+  };
 }
 
 /**

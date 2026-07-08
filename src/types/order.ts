@@ -31,6 +31,32 @@ export type OrderItemView = {
   lineTotal: string;
 };
 
+/** One row in the customer's order-history list (Phase D.1). Lightweight —
+ * no address, no line items, no payment internals. `firstItemName`/`slug`
+ * come from the first OrderItem's productSnapshot, for the card label +
+ * placeholder illustration. */
+export type OrderSummary = {
+  orderNumber: string;
+  createdAt: string;
+  status: OrderStatus;
+  paymentMethod: PaymentMethod;
+  deliveryZone: DeliveryZone;
+  total: string;
+  /** Sum of item quantities across the order. */
+  itemCount: number;
+  firstItemName: string;
+  firstItemSlug: string;
+};
+
+/** Paginated order-history response (matches the API list convention). */
+export type OrderListResult = {
+  data: OrderSummary[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
 export type OrderDetailView = {
   orderNumber: string;
   status: OrderStatus;
