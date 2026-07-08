@@ -132,6 +132,7 @@ Update this list as each phase completes. Also append a one-line note to `docs/p
 - [x] Phase C.2 — 2026-07-06 — checkout + transactional order placement + confirmation; Phase C complete
 - [x] Phase C — cart + checkout — complete (C.1 cart, C.2 checkout + order placement)
 - [x] Phase C.3 (revision) — 2026-07-08 — revised order lifecycle (ADR-016): zone-based delivery (explicit Inside/Outside Dhaka radio), method-specific initial status (prepaid → WAITING_FOR_PAYMENT, COD → WAITING_FOR_ORDER_CONFIRMATION), gated manufacturing (no Manufacturing row at placement)
+- [x] Phase D.1 — 2026-07-08 — order history list (/account/orders), Orders nav item + Overview count, method-aware status tracker stepper
 - [ ] Phase D — payments + customer dashboard
 - [ ] Phase E — admin dashboard (products, payments, orders, customers, manufacturing)
 - [ ] Phase F — notifications (email + SMS) + invoices
