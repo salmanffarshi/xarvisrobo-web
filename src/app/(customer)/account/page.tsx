@@ -4,6 +4,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { getProfile } from "@/services/account-service";
 import { list as listAddresses } from "@/services/address-service";
+import { listForCustomer } from "@/services/order-service";
 
 export const metadata: Metadata = {
   title: "My account",
@@ -16,9 +17,11 @@ export default async function AccountOverviewPage() {
   const session = await auth();
   const userId = session!.user.id;
 
-  const [profile, addresses] = await Promise.all([
+  const [profile, addresses, orders] = await Promise.all([
     getProfile(userId),
     listAddresses(userId),
+    // Only the total is needed here — limit 1 keeps the query light.
+    listForCustomer(userId, { limit: 1 }),
   ]);
 
   const firstName = profile.name.split(" ")[0];
@@ -63,14 +66,22 @@ export default async function AccountOverviewPage() {
           </Link>
         </div>
 
-        {/* Static placeholder — real order history arrives with checkout in a
-            later phase (Phase D). */}
         <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-6 sm:col-span-2">
           <h2 className="text-sm font-medium text-neutral-500">Orders</h2>
-          <p className="mt-3 text-sm text-neutral-600">
-            No orders yet — your orders will appear here. Order history arrives
-            in a later phase.
+          <p className="mt-3 font-medium">
+            {orders.total === 0
+              ? "No orders yet"
+              : `${orders.total} ${orders.total === 1 ? "order" : "orders"}`}
           </p>
+          <p className="mt-1 text-sm text-neutral-600">
+            Track the status of every order you&apos;ve placed.
+          </p>
+          <Link
+            href="/account/orders"
+            className="mt-4 inline-block text-sm font-medium text-blue-600 hover:underline"
+          >
+            View orders
+          </Link>
         </div>
       </div>
     </section>

@@ -7,7 +7,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Lock, LogOut, MapPin, User } from "lucide-react";
+import { LayoutDashboard, Lock, LogOut, MapPin, Package, User } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { signOutAction } from "@/components/layout/sign-out-action";
@@ -15,6 +15,15 @@ import { signOutAction } from "@/components/layout/sign-out-action";
 const NAV_ITEMS = [
   // `exact` on Overview so /account/profile doesn't also light it up.
   { label: "Overview", href: "/account", icon: LayoutDashboard, exact: true },
+  // startsWith (exact: false) keeps Orders lit on both the list and the
+  // /account/orders/[orderNumber] detail page.
+  {
+    label: "Orders",
+    href: "/account/orders",
+    icon: Package,
+    exact: false,
+    strokeWidth: 1.5,
+  },
   { label: "Profile", href: "/account/profile", icon: User, exact: false },
   { label: "Addresses", href: "/account/addresses", icon: MapPin, exact: false },
   {
@@ -33,7 +42,7 @@ export function AccountNav() {
       aria-label="Account"
       className="flex items-center gap-1 overflow-x-auto lg:flex-col lg:items-stretch lg:overflow-visible"
     >
-      {NAV_ITEMS.map(({ label, href, icon: Icon, exact }) => {
+      {NAV_ITEMS.map(({ label, href, icon: Icon, exact, strokeWidth }) => {
         const isActive = exact ? pathname === href : pathname.startsWith(href);
         return (
           <Link
@@ -47,7 +56,7 @@ export function AccountNav() {
                 : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
             )}
           >
-            <Icon className="size-4" />
+            <Icon className="size-4" strokeWidth={strokeWidth} />
             {label}
           </Link>
         );
