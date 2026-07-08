@@ -3,6 +3,17 @@
 // steps the tracker component renders. Two paths — prepaid has a payment
 // gate, COD has a phone-confirmation gate — so the step labels differ by
 // method. Manufacturing internals never appear here (ADR-006).
+//
+// SEMANTICS (Convention A): the node that matches the order's CURRENT status
+// is the "current" (highlighted) node — it's the state the order is actually
+// in. Every node before it is "complete"; every node after is "upcoming".
+// DELIVERED is the one exception: the journey is finished, so all nodes are
+// "complete" and there is NO current node.
+//
+// Each status therefore maps to a `currentIndex` = the index of the current
+// node in its path (equivalently, how many leading nodes are complete before
+// it). For DELIVERED we use `path length`, which leaves every node complete
+// and none current.
 
 import type { OrderStatus, PaymentMethod } from "@prisma/client";
 
@@ -19,10 +30,7 @@ export type OrderProgress = {
 };
 
 // The two ordered journeys (labels are customer-facing, verbatim from the
-// D.1 spec). A status maps to a "completed count": that many leading steps
-// are complete, the next is current, the rest upcoming. When the count
-// equals the path length (DELIVERED), every step is complete and there is
-// no current step.
+// D.1 spec).
 const PREPAID_STEPS = [
   "Placed",
   "Payment Submitted",
@@ -46,22 +54,23 @@ function assertNever(status: never): never {
   throw new Error(`Unhandled order status: ${String(status)}`);
 }
 
-// Completed-count for the prepaid path. CANCELLED is handled before this is
-// called, but the switch still covers it so the never-check stays exhaustive.
-function prepaidCompletedCount(status: OrderStatus): number {
+// Index of the current node on the prepaid path (Convention A). CANCELLED is
+// handled before this is called, but the switch still covers it so the
+// never-check stays exhaustive.
+function prepaidCurrentIndex(status: OrderStatus): number {
   switch (status) {
     case "WAITING_FOR_PAYMENT":
-      return 1;
+      return 0; // current = Placed
     case "WAITING_FOR_PAYMENT_VERIFICATION":
-      return 2;
+      return 1; // current = Payment Submitted
     case "PAYMENT_VERIFIED":
-      return 3;
+      return 2; // current = Payment Verified
     case "IN_PRODUCTION":
-      return 4;
+      return 3; // current = In Production
     case "SHIPPED":
-      return 5;
+      return 4; // current = Shipped
     case "DELIVERED":
-      return 6;
+      return PREPAID_STEPS.length; // all complete, no current
     // COD-only + terminal statuses can't reach a prepaid order in practice;
     // list them so the enum is covered exhaustively.
     case "WAITING_FOR_ORDER_CONFIRMATION":
@@ -73,18 +82,18 @@ function prepaidCompletedCount(status: OrderStatus): number {
   }
 }
 
-function codCompletedCount(status: OrderStatus): number {
+function codCurrentIndex(status: OrderStatus): number {
   switch (status) {
     case "WAITING_FOR_ORDER_CONFIRMATION":
-      return 1;
+      return 0; // current = Placed
     case "ORDER_CONFIRMED":
-      return 2;
+      return 1; // current = Order Confirmed
     case "IN_PRODUCTION":
-      return 3;
+      return 2; // current = In Production
     case "SHIPPED":
-      return 4;
+      return 3; // current = Shipped
     case "DELIVERED":
-      return 5;
+      return COD_STEPS.length; // all complete, no current
     // Prepaid-only + terminal statuses can't reach a COD order in practice.
     case "WAITING_FOR_PAYMENT":
     case "WAITING_FOR_PAYMENT_VERIFICATION":
@@ -98,13 +107,13 @@ function codCompletedCount(status: OrderStatus): number {
 
 function buildSteps(
   labels: readonly string[],
-  completedCount: number,
+  currentIndex: number,
 ): ProgressStep[] {
   return labels.map((label, index) => {
     let state: StepState;
-    if (index < completedCount) {
+    if (index < currentIndex) {
       state = "complete";
-    } else if (index === completedCount) {
+    } else if (index === currentIndex) {
       state = "current";
     } else {
       state = "upcoming";
@@ -128,9 +137,9 @@ export function getOrderProgress(
 
   const isCod = paymentMethod === "COD";
   const labels = isCod ? COD_STEPS : PREPAID_STEPS;
-  const completedCount = isCod
-    ? codCompletedCount(status)
-    : prepaidCompletedCount(status);
+  const currentIndex = isCod
+    ? codCurrentIndex(status)
+    : prepaidCurrentIndex(status);
 
-  return { cancelled: false, steps: buildSteps(labels, completedCount) };
+  return { cancelled: false, steps: buildSteps(labels, currentIndex) };
 }
