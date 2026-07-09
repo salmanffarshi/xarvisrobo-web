@@ -72,5 +72,14 @@ export type OrderDetailView = {
   deliveryNotes: string | null;
   createdAt: string;
   items: OrderItemView[];
-  payment: { status: PaymentStatus };
+  /** Payment intent + any proof the customer has submitted (Phase D.2). The
+   * proof fields are null until they submit; screenshotUrl stays null if they
+   * submit without an image. */
+  payment: {
+    status: PaymentStatus;
+    transactionId: string | null;
+    senderNumber: string | null;
+    paidAmount: string | null;
+    screenshotUrl: string | null;
+  };
 };

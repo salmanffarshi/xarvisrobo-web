@@ -4,19 +4,13 @@ import { notFound } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 
 import { auth } from "@/auth";
-import {
-  paymentGeneralNote,
-  paymentReceivingDetails,
-  type PrepaidMethod,
-} from "@/config/payment";
-import { DELIVERY_ZONE_LABELS } from "@/lib/delivery";
 import { formatBdt } from "@/lib/format";
 import { ORDER_STATUS_LABELS, statusTone } from "@/lib/order-status";
 import { cn } from "@/lib/utils";
 import { getOrderForCustomer } from "@/services/order-service";
-import type { OrderDetailView } from "@/types/order";
 import { Badge } from "@/components/ui/badge";
 import { OrderStatusTracker } from "@/components/order/order-status-tracker";
+import { OrderActionBlock } from "@/components/order/order-action-block";
 
 export const metadata: Metadata = {
   title: "Order details",
@@ -29,81 +23,6 @@ const TONE_CLASSES: Record<ReturnType<typeof statusTone>, string> = {
   success: "bg-emerald-50 text-emerald-700",
   terminal: "bg-neutral-100 text-neutral-600",
 };
-
-function PaymentInstructions({ order }: { order: OrderDetailView }) {
-  if (order.paymentMethod === "COD") {
-    return (
-      <p className="text-sm text-neutral-600">
-        Your order is placed. Our team will call you at{" "}
-        <span className="font-medium text-neutral-900">
-          {order.contactPhone}
-        </span>{" "}
-        to confirm before we begin building your robot. Delivery charge{" "}
-        {formatBdt(order.deliveryCharge)} (
-        {DELIVERY_ZONE_LABELS[order.deliveryZone]}) is payable on delivery.
-      </p>
-    );
-  }
-
-  const method = order.paymentMethod as PrepaidMethod;
-  const details = paymentReceivingDetails[method];
-
-  return (
-    <div className="space-y-3 text-sm text-neutral-600">
-      <dl className="grid gap-x-6 gap-y-1.5 sm:grid-cols-[auto_1fr]">
-        {"bankName" in details ? (
-          <>
-            <dt className="text-neutral-500">Bank</dt>
-            <dd className="font-medium text-neutral-900">{details.bankName}</dd>
-            <dt className="text-neutral-500">Account name</dt>
-            <dd className="font-medium text-neutral-900">
-              {details.accountName}
-            </dd>
-            <dt className="text-neutral-500">Account number</dt>
-            <dd className="font-medium tabular-nums text-neutral-900">
-              {details.accountNumber}
-            </dd>
-            <dt className="text-neutral-500">Branch</dt>
-            <dd className="font-medium text-neutral-900">{details.branch}</dd>
-            {details.routingNumber && (
-              <>
-                <dt className="text-neutral-500">Routing number</dt>
-                <dd className="font-medium tabular-nums text-neutral-900">
-                  {details.routingNumber}
-                </dd>
-              </>
-            )}
-          </>
-        ) : (
-          <>
-            <dt className="text-neutral-500">
-              {method === "BKASH" ? "bKash" : "Nagad"} number
-            </dt>
-            <dd className="font-medium tabular-nums text-neutral-900">
-              {details.number}
-            </dd>
-            <dt className="text-neutral-500">Account type</dt>
-            <dd className="font-medium text-neutral-900 capitalize">
-              {details.accountType}
-            </dd>
-          </>
-        )}
-        <dt className="text-neutral-500">Amount to send</dt>
-        <dd className="font-medium tabular-nums text-neutral-900">
-          {formatBdt(order.total)}
-        </dd>
-        <dt className="text-neutral-500">Reference</dt>
-        <dd className="font-medium text-neutral-900">{order.orderNumber}</dd>
-      </dl>
-      {details.instructions && <p>{details.instructions}</p>}
-      <p>{paymentGeneralNote}</p>
-      <p className="text-neutral-500">
-        You&apos;ll be able to submit your payment details from your account
-        soon.
-      </p>
-    </div>
-  );
-}
 
 // Order confirmation + detail page (Phase C.2). Doubles as the post-checkout
 // confirmation (?placed=1 shows the banner) and the revisitable order detail.
@@ -222,17 +141,9 @@ export default async function OrderDetailPage({
           </div>
         </div>
 
-        {/* Payment instructions */}
-        <div className="rounded-2xl border border-neutral-200 p-6">
-          <h2 className="text-sm font-medium text-neutral-500">
-            {order.paymentMethod === "COD"
-              ? "Cash on delivery"
-              : "How to pay"}
-          </h2>
-          <div className="mt-3">
-            <PaymentInstructions order={order} />
-          </div>
-        </div>
+        {/* Payment / action block (Phase D.2) — gated: renders only for
+            actionable states, nothing otherwise (cancelled/delivered/etc). */}
+        <OrderActionBlock order={order} />
 
         {/* Shipping address (frozen snapshot — ADR-004) + contact */}
         <div className="rounded-2xl border border-neutral-200 p-6">

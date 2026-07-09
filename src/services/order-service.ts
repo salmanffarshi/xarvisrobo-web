@@ -342,7 +342,15 @@ export async function getOrderForCustomer(
     where: { orderNumber, userId },
     include: {
       items: { orderBy: { id: "asc" } },
-      payment: { select: { status: true } },
+      payment: {
+        select: {
+          status: true,
+          transactionId: true,
+          senderNumber: true,
+          paidAmount: true,
+          screenshotUrl: true,
+        },
+      },
     },
   });
   if (!order || !order.payment) {
@@ -372,6 +380,12 @@ export async function getOrderForCustomer(
         lineTotal: item.lineTotal.toFixed(2),
       };
     }),
-    payment: { status: order.payment.status },
+    payment: {
+      status: order.payment.status,
+      transactionId: order.payment.transactionId,
+      senderNumber: order.payment.senderNumber,
+      paidAmount: order.payment.paidAmount?.toFixed(2) ?? null,
+      screenshotUrl: order.payment.screenshotUrl,
+    },
   };
 }
