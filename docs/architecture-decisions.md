@@ -504,3 +504,24 @@ row is deferred.
 repeat customers; or delivery-cost changes require per-courier / per-weight
 charges (would replace the flat inside/outside zone split); or we later want
 more than two zones (would extend the DeliveryZone enum + the radio).
+
+---
+
+### D.2 amendment (2026-07-09)
+
+Two simplifications after D.2 shipped, both refining ADR-016's payment surface:
+
+1. **Bank Transfer removed as a payment method.** `PaymentMethod` is now
+   `{ BKASH, NAGAD, COD }` (migration `remove_bank_payment_method`). Prepaid
+   means bKash or Nagad only. Bank transfer added verification friction (manual
+   statement matching) for little demand at this stage; it can return later as
+   a new enum value without touching the prepaid flow. Removed across
+   schema/config/validation/checkout/confirmation.
+
+2. **Payment proof no longer collects the paid amount.** Each product has a
+   fixed, already-communicated price and free prepaid delivery, so the amount is
+   known — the customer identifies their payment by transaction ID + sender
+   number (+ optional screenshot), which is what the admin verifies against in
+   Phase E. The `Payment.paidAmount` column is LEFT in place (nullable,
+   unpopulated) — dropping a column is a separate migration and it's harmless;
+   only the collection/write and the read-back display were removed.

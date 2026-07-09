@@ -56,7 +56,7 @@ Act as a senior software architect and lead full-stack engineer.
 ## Payment logic
 
 - No payment gateway. Manual verification only.
-- Methods: `BKASH`, `NAGAD`, `BANK` (customer submits screenshot + txn ID + sender number + paid amount), and `COD`.
+- Methods: `BKASH`, `NAGAD` (customer submits txn ID + sender number + optional screenshot), and `COD`. (Bank Transfer removed in the D.2 amendment — see ADR-016.)
 - **COD adds a flat ৳130 delivery charge** as `Order.deliveryCharge`. Non-COD methods have 0 delivery charge unless explicitly configured.
 - Currency is always BDT. Stored as `String @default("BDT")` for future-proofing.
 - Bangladesh-only shipping in v1.
