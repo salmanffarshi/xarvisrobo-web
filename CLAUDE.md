@@ -75,6 +75,11 @@ Act as a senior software architect and lead full-stack engineer.
 
 **Manufacturing stage advancement does NOT auto-transition customer-facing status.** Admin explicitly clicks "Mark as Shipped" when the courier is actually notified.
 
+**Customer-facing labels (Phase D.2):** two `OrderStatus` values read differently to customers than their enum name — the ENUM VALUES are unchanged, only the display label (in `src/lib/order-status.ts` + the stepper):
+- `IN_PRODUCTION` → shown as **"Preparing"** (never reveal build-to-order).
+- `WAITING_FOR_PAYMENT_VERIFICATION` → shown as **"Payment Submitted"**.
+Always use the enum value in code/DB/logs; only the label differs.
+
 ## Out of scope for v1 (do not build unless explicitly asked)
 
 Architecture must accommodate these later without redesign, but do not build them now:
@@ -133,7 +138,8 @@ Update this list as each phase completes. Also append a one-line note to `docs/p
 - [x] Phase C — cart + checkout — complete (C.1 cart, C.2 checkout + order placement)
 - [x] Phase C.3 (revision) — 2026-07-08 — revised order lifecycle (ADR-016): zone-based delivery (explicit Inside/Outside Dhaka radio), method-specific initial status (prepaid → WAITING_FOR_PAYMENT, COD → WAITING_FOR_ORDER_CONFIRMATION), gated manufacturing (no Manufacturing row at placement)
 - [x] Phase D.1 — 2026-07-08 — order history list (/account/orders), Orders nav item + Overview count, method-aware status tracker stepper
-- [ ] Phase D — payments + customer dashboard
+- [x] Phase D.2 — 2026-07-09 — payment proof form (Cloudinary signed upload) + WhatsApp handoff, COD WhatsApp, label changes, gated action block; Phase D complete
+- [x] Phase D — payments + customer dashboard (D.1 order history + tracker, D.2 payment proof + WhatsApp + gated action block)
 - [ ] Phase E — admin dashboard (products, payments, orders, customers, manufacturing)
 - [ ] Phase F — notifications (email + SMS) + invoices
 - [ ] Phase G — pre-launch (security review, deploy)
