@@ -12,6 +12,12 @@ export const CURRENCY = "BDT";
 export const COD_DELIVERY_INSIDE_DHAKA = 60; // ADR-016
 export const COD_DELIVERY_OUTSIDE_DHAKA = 130; // ADR-016
 
+// Business WhatsApp number in international format, digits only (no +, no
+// spaces) — the form wa.me/<number> requires. Used for the payment-proof and
+// COD-confirmation handoffs (Phase D.2). Admin-editable in Phase E.
+// REPLACE BEFORE LAUNCH — this is a placeholder, not the real number.
+export const WHATSAPP_NUMBER = "8801XXXXXXXXX";
+
 export type PrepaidMethod = "BKASH" | "NAGAD" | "BANK";
 
 export interface MobileWalletDetails {

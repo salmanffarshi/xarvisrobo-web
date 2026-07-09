@@ -35,7 +35,7 @@ const PREPAID_STEPS = [
   "Placed",
   "Payment Submitted",
   "Payment Verified",
-  "In Production",
+  "Preparing", // IN_PRODUCTION — shown as "Preparing" to customers (Phase D.2)
   "Shipped",
   "Delivered",
 ] as const;
@@ -43,7 +43,7 @@ const PREPAID_STEPS = [
 const COD_STEPS = [
   "Placed",
   "Order Confirmed",
-  "In Production",
+  "Preparing", // IN_PRODUCTION — shown as "Preparing" to customers (Phase D.2)
   "Shipped",
   "Delivered",
 ] as const;

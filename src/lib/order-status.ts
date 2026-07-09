@@ -5,14 +5,20 @@
 
 import type { OrderStatus } from "@prisma/client";
 
-/** Human-readable labels, verbatim from ADR-016. */
+/**
+ * Human-readable labels. Mostly verbatim from ADR-016, with two deliberate
+ * customer-facing overrides (Phase D.2) — the ENUM VALUES are unchanged, only
+ * how they read to the customer:
+ *   - WAITING_FOR_PAYMENT_VERIFICATION → "Payment Submitted" (calmer, clearer)
+ *   - IN_PRODUCTION → "Preparing" (never reveal build-to-order to customers)
+ */
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   WAITING_FOR_PAYMENT: "Waiting for Payment",
-  WAITING_FOR_PAYMENT_VERIFICATION: "Waiting for Payment Verification",
+  WAITING_FOR_PAYMENT_VERIFICATION: "Payment Submitted",
   PAYMENT_VERIFIED: "Payment Verified",
   WAITING_FOR_ORDER_CONFIRMATION: "Waiting for Order Confirmation",
   ORDER_CONFIRMED: "Order Confirmed",
-  IN_PRODUCTION: "In Production",
+  IN_PRODUCTION: "Preparing",
   SHIPPED: "Shipped",
   DELIVERED: "Delivered",
   CANCELLED: "Cancelled",
