@@ -46,7 +46,7 @@ export class InvalidScreenshotError extends Error {
   }
 }
 
-const PREPAID_METHODS = ["BKASH", "NAGAD", "BANK"] as const;
+const PREPAID_METHODS = ["BKASH", "NAGAD"] as const;
 
 /**
  * Record a customer's payment proof and advance the order to

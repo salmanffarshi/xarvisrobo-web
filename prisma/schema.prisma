@@ -36,7 +36,6 @@ enum UserRole {
 enum PaymentMethod {
   BKASH
   NAGAD
-  BANK
   COD
 }
 

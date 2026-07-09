@@ -23,7 +23,7 @@ export const DELIVERY_ZONE_LABELS: Record<DeliveryZone, string> = {
 
 /**
  * Delivery charge as a 2dp decimal string, from payment method + chosen zone:
- * - prepaid (BKASH/NAGAD/BANK) → "0.00" (free everywhere)
+ * - prepaid (BKASH/NAGAD) → "0.00" (free everywhere)
  * - COD + INSIDE_DHAKA  → "60.00"
  * - COD + OUTSIDE_DHAKA → "130.00"
  */

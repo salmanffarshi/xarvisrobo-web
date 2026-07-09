@@ -65,11 +65,6 @@ const PAYMENT_OPTIONS: {
     descriptor: "Send money to our Nagad number — details after you order.",
   },
   {
-    value: "BANK",
-    label: "Bank transfer",
-    descriptor: "Transfer to our bank account — details after you order.",
-  },
-  {
     value: "COD",
     label: "Cash on delivery",
     descriptor: "Pay in cash when your robot arrives.",

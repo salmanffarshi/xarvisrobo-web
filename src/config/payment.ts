@@ -18,7 +18,7 @@ export const COD_DELIVERY_OUTSIDE_DHAKA = 130; // ADR-016
 // REPLACE BEFORE LAUNCH — this is a placeholder, not the real number.
 export const WHATSAPP_NUMBER = "8801XXXXXXXXX";
 
-export type PrepaidMethod = "BKASH" | "NAGAD" | "BANK";
+export type PrepaidMethod = "BKASH" | "NAGAD";
 
 export interface MobileWalletDetails {
   accountType: "personal" | "merchant";
@@ -26,19 +26,9 @@ export interface MobileWalletDetails {
   instructions?: string;
 }
 
-export interface BankDetails {
-  bankName: string;
-  accountName: string;
-  accountNumber: string;
-  branch: string;
-  routingNumber?: string;
-  instructions?: string;
-}
-
 export const paymentReceivingDetails: {
   BKASH: MobileWalletDetails;
   NAGAD: MobileWalletDetails;
-  BANK: BankDetails;
 } = {
   BKASH: {
     accountType: "personal",
@@ -49,14 +39,6 @@ export const paymentReceivingDetails: {
     accountType: "personal",
     number: "PLACEHOLDER_01XXXXXXXXX",
     instructions: "Use 'Send Money', not 'Payment'.",
-  },
-  BANK: {
-    bankName: "PLACEHOLDER_Bank Name",
-    accountName: "PLACEHOLDER_Xarvisrobo",
-    accountNumber: "PLACEHOLDER_XXXXXXXXXXXX",
-    branch: "PLACEHOLDER_Branch name",
-    routingNumber: "PLACEHOLDER_optional",
-    instructions: undefined,
   },
 };
 

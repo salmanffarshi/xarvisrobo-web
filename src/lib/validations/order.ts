@@ -15,7 +15,7 @@ export const placeOrderSchema = z.object({
     .trim()
     .max(1000, "Delivery notes must be 1000 characters or fewer")
     .optional(),
-  paymentMethod: z.enum(["BKASH", "NAGAD", "BANK", "COD"]),
+  paymentMethod: z.enum(["BKASH", "NAGAD", "COD"]),
   // Explicit customer radio at checkout — not derived from the address (ADR-016).
   deliveryZone: z.enum(["INSIDE_DHAKA", "OUTSIDE_DHAKA"]),
 });

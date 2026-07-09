@@ -60,7 +60,7 @@ function WhatsAppButton({ href, label }: { href: string; label: string }) {
   );
 }
 
-/** Receiving-account details for a prepaid method (bKash / Nagad / bank). */
+/** Receiving-account details for a prepaid method (bKash / Nagad). */
 function PrepaidInstructions({ order }: { order: OrderDetailView }) {
   const method = order.paymentMethod as PrepaidMethod;
   const details = paymentReceivingDetails[method];
@@ -68,41 +68,16 @@ function PrepaidInstructions({ order }: { order: OrderDetailView }) {
   return (
     <div className="space-y-3 text-sm text-neutral-600">
       <dl className="grid gap-x-6 gap-y-1.5 sm:grid-cols-[auto_1fr]">
-        {"bankName" in details ? (
-          <>
-            <dt className="text-neutral-500">Bank</dt>
-            <dd className="font-medium text-neutral-900">{details.bankName}</dd>
-            <dt className="text-neutral-500">Account name</dt>
-            <dd className="font-medium text-neutral-900">{details.accountName}</dd>
-            <dt className="text-neutral-500">Account number</dt>
-            <dd className="font-medium tabular-nums text-neutral-900">
-              {details.accountNumber}
-            </dd>
-            <dt className="text-neutral-500">Branch</dt>
-            <dd className="font-medium text-neutral-900">{details.branch}</dd>
-            {details.routingNumber && (
-              <>
-                <dt className="text-neutral-500">Routing number</dt>
-                <dd className="font-medium tabular-nums text-neutral-900">
-                  {details.routingNumber}
-                </dd>
-              </>
-            )}
-          </>
-        ) : (
-          <>
-            <dt className="text-neutral-500">
-              {method === "BKASH" ? "bKash" : "Nagad"} number
-            </dt>
-            <dd className="font-medium tabular-nums text-neutral-900">
-              {details.number}
-            </dd>
-            <dt className="text-neutral-500">Account type</dt>
-            <dd className="font-medium text-neutral-900 capitalize">
-              {details.accountType}
-            </dd>
-          </>
-        )}
+        <dt className="text-neutral-500">
+          {method === "BKASH" ? "bKash" : "Nagad"} number
+        </dt>
+        <dd className="font-medium tabular-nums text-neutral-900">
+          {details.number}
+        </dd>
+        <dt className="text-neutral-500">Account type</dt>
+        <dd className="font-medium text-neutral-900 capitalize">
+          {details.accountType}
+        </dd>
         <dt className="text-neutral-500">Amount to send</dt>
         <dd className="font-medium tabular-nums text-neutral-900">
           {formatBdt(order.total)}

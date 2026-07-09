@@ -12,10 +12,9 @@ import { DELIVERY_ZONE_LABELS } from "@/lib/delivery";
 import type { OrderDetailView } from "@/types/order";
 
 /** Human-friendly names for the prepaid methods in customer messages. */
-const METHOD_LABELS: Record<"BKASH" | "NAGAD" | "BANK", string> = {
+const METHOD_LABELS: Record<"BKASH" | "NAGAD", string> = {
   BKASH: "bKash",
   NAGAD: "Nagad",
-  BANK: "Bank transfer",
 };
 
 /** Build a WhatsApp click-to-chat URL to the business number. */
@@ -26,7 +25,7 @@ export function buildWhatsAppUrl(message: string): string {
 /** Prepaid: the customer says they've paid and will attach the screenshot. */
 export function prepaidProofMessage(order: OrderDetailView): string {
   const method =
-    METHOD_LABELS[order.paymentMethod as "BKASH" | "NAGAD" | "BANK"] ??
+    METHOD_LABELS[order.paymentMethod as "BKASH" | "NAGAD"] ??
     order.paymentMethod;
   return (
     `Hello Xarvisrobo, I've paid for order ${order.orderNumber}. ` +
