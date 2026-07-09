@@ -93,13 +93,13 @@ export async function submitPaymentProof(
     }
 
     // 3. Record the reported details. Payment.status STAYS PENDING — an admin
-    //    verifies in Phase E. paidAmount is a decimal string → Decimal column.
+    //    verifies in Phase E. Payment.paidAmount is left unpopulated as of the
+    //    D.2 amendment (amount no longer collected; the column remains nullable).
     await tx.payment.update({
       where: { id: order.payment.id },
       data: {
         transactionId: parsed.transactionId,
         senderNumber: parsed.senderNumber,
-        paidAmount: parsed.paidAmount,
         ...(parsed.screenshotUrl
           ? { screenshotUrl: parsed.screenshotUrl }
           : {}),

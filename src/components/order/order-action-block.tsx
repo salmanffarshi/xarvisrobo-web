@@ -108,7 +108,6 @@ export function OrderActionBlock({ order }: { order: OrderDetailView }) {
             </p>
             <PaymentProofForm
               orderNumber={order.orderNumber}
-              defaultAmount={order.total}
               whatsappUrl={buildWhatsAppUrl(prepaidProofMessage(order))}
             />
           </div>
@@ -135,10 +134,6 @@ export function OrderActionBlock({ order }: { order: OrderDetailView }) {
             <dt className="text-neutral-500">Sender number</dt>
             <dd className="font-medium tabular-nums text-neutral-900">
               {payment.senderNumber ?? "—"}
-            </dd>
-            <dt className="text-neutral-500">Amount paid</dt>
-            <dd className="font-medium tabular-nums text-neutral-900">
-              {payment.paidAmount ? formatBdt(payment.paidAmount) : "—"}
             </dd>
           </dl>
           {payment.screenshotUrl && (

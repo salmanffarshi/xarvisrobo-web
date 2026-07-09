@@ -40,11 +40,9 @@ type FormValues = z.infer<typeof formSchema>;
 
 export function PaymentProofForm({
   orderNumber,
-  defaultAmount,
   whatsappUrl,
 }: {
   orderNumber: string;
-  defaultAmount: string;
   whatsappUrl: string;
 }) {
   const router = useRouter();
@@ -58,7 +56,6 @@ export function PaymentProofForm({
     defaultValues: {
       transactionId: "",
       senderNumber: "",
-      paidAmount: defaultAmount,
     },
   });
 
@@ -181,24 +178,6 @@ export function PaymentProofForm({
                   inputMode="numeric"
                   placeholder="01XXXXXXXXX"
                   autoComplete="off"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="paidAmount"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Amount paid (BDT)</FormLabel>
-              <FormControl>
-                <Input
-                  className="rounded-xl"
-                  inputMode="decimal"
                   {...field}
                 />
               </FormControl>
