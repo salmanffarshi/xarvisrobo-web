@@ -50,6 +50,18 @@ export const ADMIN_ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
  */
 export type StatusTone = "pending" | "progress" | "success" | "terminal";
 
+/**
+ * Tone token → badge classes, kept in the site's restrained palette. Shared by
+ * the admin order list + detail badges (the E.1 dashboard predates this and
+ * keeps its own inline copy).
+ */
+export const STATUS_TONE_CLASSES: Record<StatusTone, string> = {
+  pending: "bg-amber-50 text-amber-700",
+  progress: "bg-blue-50 text-blue-700",
+  success: "bg-emerald-50 text-emerald-700",
+  terminal: "bg-neutral-100 text-neutral-600",
+};
+
 export function statusTone(status: OrderStatus): StatusTone {
   switch (status) {
     case "WAITING_FOR_PAYMENT":
