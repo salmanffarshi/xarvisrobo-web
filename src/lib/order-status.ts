@@ -25,6 +25,25 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 };
 
 /**
+ * Internal-truth labels for STAFF (Phase E.2.1). Unlike the customer map above,
+ * these read verbatim from the ADR-016 enum — admins see the real state, with
+ * no customer-facing softening (IN_PRODUCTION is "In Production", never
+ * "Preparing"; WAITING_FOR_PAYMENT_VERIFICATION is spelled out, not "Payment
+ * Submitted"). Admin pages use THIS map; customer pages keep ORDER_STATUS_LABELS.
+ */
+export const ADMIN_ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  WAITING_FOR_PAYMENT: "Waiting for Payment",
+  WAITING_FOR_PAYMENT_VERIFICATION: "Waiting for Payment Verification",
+  PAYMENT_VERIFIED: "Payment Verified",
+  WAITING_FOR_ORDER_CONFIRMATION: "Waiting for Order Confirmation",
+  ORDER_CONFIRMED: "Order Confirmed",
+  IN_PRODUCTION: "In Production",
+  SHIPPED: "Shipped",
+  DELIVERED: "Delivered",
+  CANCELLED: "Cancelled",
+};
+
+/**
  * Coarse tone for subtly coloring a status badge, kept within the site's
  * restrained palette (pending→amber, progress→blue, success→green,
  * terminal→neutral). The caller maps the token to classes.
