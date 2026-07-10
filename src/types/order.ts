@@ -81,5 +81,9 @@ export type OrderDetailView = {
     senderNumber: string | null;
     paidAmount: string | null;
     screenshotUrl: string | null;
+    /** Admin's reason when the last proof was REJECTED (Phase E.2.2). Shown to
+     * the customer at WAITING_FOR_PAYMENT so they know what to fix on resubmit;
+     * cleared back to null on resubmission. */
+    rejectionReason: string | null;
   };
 };

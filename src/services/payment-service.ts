@@ -92,14 +92,20 @@ export async function submitPaymentProof(
       throw new InvalidStateError();
     }
 
-    // 3. Record the reported details. Payment.status STAYS PENDING — an admin
-    //    verifies in Phase E. Payment.paidAmount is left unpopulated as of the
-    //    D.2 amendment (amount no longer collected; the column remains nullable).
+    // 3. Record the reported details. Payment.status is set to PENDING and any
+    //    prior rejectionReason is cleared — a resubmission after an admin
+    //    rejection (which sent the order back to WAITING_FOR_PAYMENT with a
+    //    REJECTED payment) must return the payment to PENDING for fresh review,
+    //    and a first-time submit is already PENDING so this is a no-op there.
+    //    Payment.paidAmount is left unpopulated as of the D.2 amendment (amount
+    //    no longer collected; the column remains nullable).
     await tx.payment.update({
       where: { id: order.payment.id },
       data: {
         transactionId: parsed.transactionId,
         senderNumber: parsed.senderNumber,
+        status: "PENDING",
+        rejectionReason: null,
         ...(parsed.screenshotUrl
           ? { screenshotUrl: parsed.screenshotUrl }
           : {}),

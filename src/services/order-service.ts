@@ -358,6 +358,7 @@ export async function getOrderForCustomer(
           senderNumber: true,
           paidAmount: true,
           screenshotUrl: true,
+          rejectionReason: true,
         },
       },
     },
@@ -395,6 +396,7 @@ export async function getOrderForCustomer(
       senderNumber: order.payment.senderNumber,
       paidAmount: order.payment.paidAmount?.toFixed(2) ?? null,
       screenshotUrl: order.payment.screenshotUrl,
+      rejectionReason: order.payment.rejectionReason,
     },
   };
 }

@@ -95,11 +95,26 @@ export function OrderActionBlock({ order }: { order: OrderDetailView }) {
   const { paymentMethod, status } = order;
   const isPrepaid = paymentMethod !== "COD";
 
-  // 1. Prepaid, awaiting payment → instructions + proof form.
+  // 1. Prepaid, awaiting payment → instructions + proof form. If a prior proof
+  //    was rejected, the order is back here with a REJECTED payment carrying the
+  //    admin's reason — show it so the customer knows what to fix (Phase E.2.2).
   if (isPrepaid && status === "WAITING_FOR_PAYMENT") {
+    const wasRejected =
+      order.payment.status === "REJECTED" && order.payment.rejectionReason;
     return (
       <ActionCard heading="How to pay">
         <div className="space-y-6">
+          {wasRejected && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              <p className="font-medium">
+                Your previous payment could not be verified:
+              </p>
+              <p className="mt-1">{order.payment.rejectionReason}</p>
+              <p className="mt-2">
+                Please check the details and submit again.
+              </p>
+            </div>
+          )}
           <PrepaidInstructions order={order} />
           <div className="border-t border-neutral-100 pt-6">
             <p className="mb-4 text-sm text-neutral-600">
