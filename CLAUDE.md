@@ -140,6 +140,7 @@ Update this list as each phase completes. Also append a one-line note to `docs/p
 - [x] Phase D.1 — 2026-07-08 — order history list (/account/orders), Orders nav item + Overview count, method-aware status tracker stepper
 - [x] Phase D.2 — 2026-07-09 — payment proof form (Cloudinary signed upload) + WhatsApp handoff, COD WhatsApp, label changes, gated action block; Phase D complete
 - [x] Phase D — payments + customer dashboard (D.1 order history + tracker, D.2 payment proof + WhatsApp + gated action block)
+- [x] Phase E.1 — 2026-07-10 — admin shell + sidebar nav (Dashboard only) + read-only dashboard stats home (requireStaff guard, admin-service, /api/v1/admin/dashboard/stats). ADMIN-only for v1. Next: E.2 order operations (verify payment, confirm COD, advance status) + admin order/payment pages.
 - [ ] Phase E — admin dashboard (products, payments, orders, customers, manufacturing)
 - [ ] Phase F — notifications (email + SMS) + invoices
 - [ ] Phase G — pre-launch (security review, deploy)
