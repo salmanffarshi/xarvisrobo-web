@@ -19,6 +19,7 @@ import {
 } from "@/lib/payment-display";
 import { cn } from "@/lib/utils";
 import { adminGetOrder } from "@/services/order-service";
+import { OrderActionPanel } from "./order-action-panel";
 
 // Admin order detail (Phase E.2.1) — READ ONLY. Staff see internal truth: raw
 // payment status, manufacturing stage, and the full status-history audit trail.
@@ -129,7 +130,13 @@ export default async function AdminOrderDetailPage({
         </div>
       </header>
 
-      {/* E.2.2 action buttons (verify / confirm / advance / cancel) go here. */}
+      {/* Order actions (E.2.2) — renders only the legal actions for this status,
+          from the same rules the server guards enforce (legalNextActions). */}
+      <OrderActionPanel
+        orderNumber={order.orderNumber}
+        status={order.status}
+        paymentMethod={order.paymentMethod}
+      />
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Customer */}
