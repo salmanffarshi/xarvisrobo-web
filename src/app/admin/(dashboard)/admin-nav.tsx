@@ -1,28 +1,66 @@
 "use client";
 
 // The admin sidebar nav link list. A client component because it reads the
-// current path (usePathname) to highlight the active item. Reused in both the
-// desktop sidebar and the mobile Sheet; `onNavigate` lets the Sheet close
-// itself when a link is tapped. E.1 ships ONLY "Dashboard" — later sub-phases
-// append their own items (Orders/Payments in E.2, etc.), so no dead links now.
+// current path (usePathname) + query (useSearchParams) to highlight the active
+// item. Reused in both the desktop sidebar and the mobile Sheet; `onNavigate`
+// lets the Sheet close itself when a link is tapped. E.2.1 adds Orders + the
+// Payments queue (a pre-filtered view of the same order list).
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { LayoutDashboard, type LucideIcon } from "lucide-react";
+import { usePathname, useSearchParams } from "next/navigation";
+import {
+  CreditCard,
+  LayoutDashboard,
+  ShoppingBag,
+  type LucideIcon,
+} from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-const NAV_ITEMS: { label: string; href: string; icon: LucideIcon }[] = [
-  { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
+// The status the Payments queue pre-filters to — the payment-verification
+// queue. Shared so the nav's active-state check and the link agree.
+const PAYMENTS_STATUS = "WAITING_FOR_PAYMENT_VERIFICATION";
+
+type NavItem = {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  // How to decide the active state from the current path + query.
+  isActive: (pathname: string, status: string | null) => boolean;
+};
+
+const NAV_ITEMS: NavItem[] = [
+  {
+    label: "Dashboard",
+    href: "/admin",
+    icon: LayoutDashboard,
+    isActive: (pathname) => pathname === "/admin",
+  },
+  {
+    label: "Orders",
+    href: "/admin/orders",
+    icon: ShoppingBag,
+    // Any order view EXCEPT the Payments-queue filter (which owns its own item).
+    isActive: (pathname, status) =>
+      pathname.startsWith("/admin/orders") && status !== PAYMENTS_STATUS,
+  },
+  {
+    label: "Payments",
+    href: `/admin/orders?status=${PAYMENTS_STATUS}`,
+    icon: CreditCard,
+    isActive: (pathname, status) =>
+      pathname.startsWith("/admin/orders") && status === PAYMENTS_STATUS,
+  },
 ];
 
 export function AdminNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const status = useSearchParams().get("status");
 
   return (
     <nav className="flex flex-col gap-1">
-      {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
-        const active = pathname === href;
+      {NAV_ITEMS.map(({ label, href, icon: Icon, isActive }) => {
+        const active = isActive(pathname, status);
         return (
           <Link
             key={href}
