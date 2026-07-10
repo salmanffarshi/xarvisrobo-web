@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { Badge } from "@/components/ui/badge";
 import { requireStaffPage } from "@/lib/auth-guards";
 import { formatBdt } from "@/lib/format";
@@ -5,11 +7,11 @@ import { ORDER_STATUS_LABELS, statusTone } from "@/lib/order-status";
 import { cn } from "@/lib/utils";
 import { getDashboardStats } from "@/services/admin-service";
 
-// Read-only admin dashboard home (Phase E.1). Live aggregate stats + the 10
-// newest orders. Nothing here mutates — the actionable queues surface counts,
-// but the "review" links (and clickable order rows) arrive in E.2. The layout
-// already guards this route; requireStaffPage here is defense-in-depth and
-// gives us the signed-in name for the greeting.
+// Admin dashboard home (Phase E.1; card links wired in E.2.1). Live aggregate
+// stats + the 10 newest orders. Still read-only — the needs-attention cards and
+// recent-order rows now link into the E.2.1 order views, but nothing here
+// mutates. The layout already guards this route; requireStaffPage here is
+// defense-in-depth and gives us the signed-in name for the greeting.
 
 // Same tone → class map the customer order pages use, kept in the site's
 // restrained palette.
@@ -24,18 +26,15 @@ function StatCard({
   label,
   value,
   attention = false,
+  href,
 }: {
   label: string;
   value: string | number;
   attention?: boolean;
+  href?: string;
 }) {
-  return (
-    <div
-      className={cn(
-        "rounded-2xl border p-5",
-        attention ? "border-amber-200 bg-amber-50" : "bg-card",
-      )}
-    >
+  const content = (
+    <>
       <p
         className={cn(
           "text-sm",
@@ -52,8 +51,23 @@ function StatCard({
       >
         {value}
       </p>
-    </div>
+    </>
   );
+
+  const className = cn(
+    "block rounded-2xl border p-5",
+    attention ? "border-amber-200 bg-amber-50" : "bg-card",
+  );
+
+  // A card with a destination becomes a link (the E.2.1 order views now exist).
+  if (href) {
+    return (
+      <Link href={href} className={cn(className, "transition-shadow hover:shadow-sm")}>
+        {content}
+      </Link>
+    );
+  }
+  return <div className={className}>{content}</div>;
 }
 
 function formatDate(iso: string): string {
@@ -88,11 +102,13 @@ export default async function AdminDashboardPage() {
             label="Pending payment verifications"
             value={needsAction.pendingPaymentVerifications}
             attention={needsAction.pendingPaymentVerifications > 0}
+            href="/admin/orders?status=WAITING_FOR_PAYMENT_VERIFICATION"
           />
           <StatCard
             label="Pending COD confirmations"
             value={needsAction.pendingCodConfirmations}
             attention={needsAction.pendingCodConfirmations > 0}
+            href="/admin/orders?status=WAITING_FOR_ORDER_CONFIRMATION"
           />
         </div>
       </section>
@@ -142,7 +158,12 @@ export default async function AdminDashboardPage() {
                 {recentOrders.map((order) => (
                   <tr key={order.orderNumber} className="border-b last:border-0">
                     <td className="px-4 py-3 font-medium tabular-nums">
-                      {order.orderNumber}
+                      <Link
+                        href={`/admin/orders/${order.orderNumber}`}
+                        className="text-primary underline-offset-4 hover:underline"
+                      >
+                        {order.orderNumber}
+                      </Link>
                     </td>
                     <td className="text-muted-foreground px-4 py-3">
                       {order.customerName}
