@@ -3,7 +3,15 @@
 // totals and the newest orders — shaped for the dashboard home and reusable by
 // the /api/v1/admin/dashboard/stats endpoint.
 
-import type { OrderStatus, PaymentMethod } from "@prisma/client";
+import type {
+  DeliveryZone,
+  ManufacturingStatus,
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+} from "@prisma/client";
+
+import type { ShippingAddressSnapshot } from "@/types/order";
 
 /** One row in the "recent orders" list — the 10 newest orders, admin view. */
 export interface AdminRecentOrder {
@@ -37,4 +45,86 @@ export interface AdminDashboardStats {
     revenue: string; // decimal string; sum of DELIVERED order totals
   };
   recentOrders: AdminRecentOrder[];
+}
+
+// ============================================================================
+// ADMIN ORDER READS (Phase E.2.1) — the staff order list + detail. Unlike the
+// customer order types, these carry internal truth: the raw Payment status,
+// manufacturing stage, and the full status-history audit trail.
+// ============================================================================
+
+/** One row in the admin order list. Lightweight — enough for the table. */
+export interface AdminOrderSummary {
+  orderNumber: string;
+  createdAt: string; // ISO 8601
+  status: OrderStatus;
+  paymentMethod: PaymentMethod;
+  deliveryZone: DeliveryZone;
+  total: string; // decimal string
+  customerName: string;
+  customerEmail: string;
+  itemCount: number; // sum of item quantities
+  paymentStatus: PaymentStatus; // from the Payment row
+  hasScreenshot: boolean; // a proof screenshot was submitted
+}
+
+export interface AdminOrderListResult {
+  data: AdminOrderSummary[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+/** One line item on the admin order detail (from the OrderItem snapshot). */
+export interface AdminOrderItem {
+  name: string;
+  sku: string;
+  quantity: number;
+  unitPrice: string; // decimal string
+  lineTotal: string; // decimal string
+}
+
+/** One entry in the status-history timeline, oldest→newest. `changedBy` is the
+ * resolved actor name, or "Customer" when the changer is the order's own owner
+ * (e.g. their payment-proof submission). */
+export interface AdminOrderHistoryEntry {
+  fromStatus: OrderStatus | null;
+  toStatus: OrderStatus;
+  changedBy: string;
+  note: string | null;
+  createdAt: string; // ISO 8601
+}
+
+/** Full staff view of one order — customer, items, address snapshot, payment
+ * internals, manufacturing stage (if any), and the audit trail. */
+export interface AdminOrderDetail {
+  orderNumber: string;
+  status: OrderStatus;
+  paymentMethod: PaymentMethod;
+  deliveryZone: DeliveryZone;
+  subtotal: string;
+  deliveryCharge: string;
+  total: string;
+  currency: string;
+  createdAt: string;
+  customerName: string;
+  customerEmail: string;
+  contactPhone: string;
+  deliveryNotes: string | null;
+  shippingAddress: ShippingAddressSnapshot;
+  items: AdminOrderItem[];
+  payment: {
+    method: PaymentMethod;
+    status: PaymentStatus;
+    transactionId: string | null;
+    senderNumber: string | null;
+    screenshotUrl: string | null;
+    rejectionReason: string | null;
+    verifiedAt: string | null; // ISO 8601
+  };
+  /** null when no Manufacturing row exists yet (order not past the production
+   * gate — ADR-016). */
+  manufacturingStatus: ManufacturingStatus | null;
+  statusHistory: AdminOrderHistoryEntry[];
 }

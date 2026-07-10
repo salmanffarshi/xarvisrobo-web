@@ -22,7 +22,11 @@
 //
 // Pre-order model: no stock checks, no stock decrement.
 
-import { Prisma, type OrderStatus } from "@prisma/client";
+import {
+  Prisma,
+  type OrderStatus,
+  type PaymentMethod,
+} from "@prisma/client";
 
 import { db } from "@/lib/db";
 import { computeDeliveryCharge } from "@/lib/delivery";
@@ -32,6 +36,11 @@ import {
   placeOrderSchema,
   type PlaceOrderInput,
 } from "@/lib/validations/order";
+import type {
+  AdminOrderDetail,
+  AdminOrderListResult,
+  AdminOrderSummary,
+} from "@/types/admin";
 import type {
   OrderDetailView,
   OrderListResult,
@@ -387,5 +396,178 @@ export async function getOrderForCustomer(
       paidAmount: order.payment.paidAmount?.toFixed(2) ?? null,
       screenshotUrl: order.payment.screenshotUrl,
     },
+  };
+}
+
+// ============================================================================
+// ADMIN READS (Phase E.2.1) — staff-scoped, NOT limited to one user's orders.
+// The caller is already staff-guarded at the route (requireStaff); these
+// functions do no auth themselves. Read-only: no mutation, no Manufacturing
+// creation — that's E.2.2.
+// ============================================================================
+
+/** Filters for the admin order list. All optional except paging. */
+export interface AdminOrderFilters {
+  status?: OrderStatus;
+  paymentMethod?: PaymentMethod;
+  /** Case-insensitive match on orderNumber OR customer name/email. */
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+/**
+ * List orders across ALL customers for the admin order table, newest first,
+ * paginated. Unlike `listForCustomer` this is not scoped to a user and it
+ * surfaces the raw Payment status + whether a proof screenshot was submitted.
+ */
+export async function adminListOrders(
+  filters: AdminOrderFilters = {},
+): Promise<AdminOrderListResult> {
+  const safeLimit = Math.min(Math.max(filters.limit ?? 20, 1), ORDER_LIST_MAX_LIMIT);
+  const safePage = Math.max(filters.page ?? 1, 1);
+
+  const search = filters.search?.trim();
+  const where: Prisma.OrderWhereInput = {
+    ...(filters.status ? { status: filters.status } : {}),
+    ...(filters.paymentMethod ? { paymentMethod: filters.paymentMethod } : {}),
+    ...(search
+      ? {
+          OR: [
+            { orderNumber: { contains: search, mode: "insensitive" } },
+            { user: { name: { contains: search, mode: "insensitive" } } },
+            { user: { email: { contains: search, mode: "insensitive" } } },
+          ],
+        }
+      : {}),
+  };
+
+  const [total, orders] = await Promise.all([
+    db.order.count({ where }),
+    db.order.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (safePage - 1) * safeLimit,
+      take: safeLimit,
+      select: {
+        orderNumber: true,
+        createdAt: true,
+        status: true,
+        paymentMethod: true,
+        deliveryZone: true,
+        total: true,
+        user: { select: { name: true, email: true } },
+        items: { select: { quantity: true } },
+        payment: { select: { status: true, screenshotUrl: true } },
+      },
+    }),
+  ]);
+
+  const data: AdminOrderSummary[] = orders.map((order) => ({
+    orderNumber: order.orderNumber,
+    createdAt: order.createdAt.toISOString(),
+    status: order.status,
+    paymentMethod: order.paymentMethod,
+    deliveryZone: order.deliveryZone,
+    total: order.total.toFixed(2),
+    customerName: order.user.name,
+    customerEmail: order.user.email,
+    itemCount: order.items.reduce((sum, item) => sum + item.quantity, 0),
+    // Every order has a Payment row (created at placement, ADR-016); default
+    // defensively so the type stays clean without a non-null assertion.
+    paymentStatus: order.payment?.status ?? "PENDING",
+    hasScreenshot: Boolean(order.payment?.screenshotUrl),
+  }));
+
+  return {
+    data,
+    page: safePage,
+    limit: safeLimit,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+  };
+}
+
+/**
+ * Full staff detail for one order by orderNumber — no owner scoping (staff see
+ * any order). Includes the Payment internals, the Manufacturing stage if a row
+ * exists, and the complete status-history audit trail (oldest→newest). Returns
+ * null when the order doesn't exist.
+ */
+export async function adminGetOrder(
+  orderNumber: string,
+): Promise<AdminOrderDetail | null> {
+  const order = await db.order.findUnique({
+    where: { orderNumber },
+    include: {
+      user: { select: { id: true, name: true, email: true } },
+      items: { orderBy: { id: "asc" } },
+      payment: true,
+      manufacturing: { select: { internalStatus: true } },
+      statusHistory: {
+        orderBy: { createdAt: "asc" },
+        include: { changedBy: { select: { id: true, name: true } } },
+      },
+    },
+  });
+  if (!order) {
+    return null;
+  }
+
+  return {
+    orderNumber: order.orderNumber,
+    status: order.status,
+    paymentMethod: order.paymentMethod,
+    deliveryZone: order.deliveryZone,
+    subtotal: order.subtotal.toFixed(2),
+    deliveryCharge: order.deliveryCharge.toFixed(2),
+    total: order.total.toFixed(2),
+    currency: order.currency,
+    createdAt: order.createdAt.toISOString(),
+    customerName: order.user.name,
+    customerEmail: order.user.email,
+    contactPhone: order.contactPhone,
+    deliveryNotes: order.deliveryNotes,
+    shippingAddress: order.shippingAddress as ShippingAddressSnapshot,
+    items: order.items.map((item) => {
+      const snapshot = item.productSnapshot as { name: string; sku: string };
+      return {
+        name: snapshot.name,
+        sku: snapshot.sku,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice.toFixed(2),
+        lineTotal: item.lineTotal.toFixed(2),
+      };
+    }),
+    payment: order.payment
+      ? {
+          method: order.payment.method,
+          status: order.payment.status,
+          transactionId: order.payment.transactionId,
+          senderNumber: order.payment.senderNumber,
+          screenshotUrl: order.payment.screenshotUrl,
+          rejectionReason: order.payment.rejectionReason,
+          verifiedAt: order.payment.verifiedAt?.toISOString() ?? null,
+        }
+      : {
+          method: order.paymentMethod,
+          status: "PENDING",
+          transactionId: null,
+          senderNumber: null,
+          screenshotUrl: null,
+          rejectionReason: null,
+          verifiedAt: null,
+        },
+    manufacturingStatus: order.manufacturing?.internalStatus ?? null,
+    statusHistory: order.statusHistory.map((entry) => ({
+      fromStatus: entry.fromStatus,
+      toStatus: entry.toStatus,
+      // The order's own customer appears as "Customer" (e.g. proof submission);
+      // any staff actor shows their name.
+      changedBy:
+        entry.changedBy.id === order.user.id ? "Customer" : entry.changedBy.name,
+      note: entry.note,
+      createdAt: entry.createdAt.toISOString(),
+    })),
   };
 }
