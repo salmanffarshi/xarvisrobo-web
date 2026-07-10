@@ -11,13 +11,18 @@
 // The union is discriminated (each variant marks the other key `never`), so
 // after the `if` TypeScript knows `guard.session` exists — no `!` needed.
 
+import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
 import type { Session } from "next-auth";
 
 import { auth } from "@/auth";
-import { isCustomer } from "@/lib/permissions";
+import { isCustomer, isStaff } from "@/lib/permissions";
 
 type CustomerGuard =
+  | { session: Session; response?: never }
+  | { session?: never; response: NextResponse };
+
+type StaffGuard =
   | { session: Session; response?: never }
   | { session?: never; response: NextResponse };
 
@@ -42,4 +47,44 @@ export async function requireCustomer(): Promise<CustomerGuard> {
     };
   }
   return { session };
+}
+
+/**
+ * API counterpart to `requireCustomer`, for `/api/v1/admin/*` handlers (Phase
+ * E.1). Verifies the request carries a signed-in STAFF session (any non-CUSTOMER
+ * role — ADMIN-only in v1, but the predicate stays role-agnostic). Customer
+ * sessions are rejected (ADR-002: a customer session never grants admin access).
+ * Returns EITHER the session OR a ready-made 401 — same two-line handler pattern.
+ * This is the per-route belt on top of the middleware suspenders.
+ */
+export async function requireStaff(): Promise<StaffGuard> {
+  const session = await auth();
+  if (!session?.user || !isStaff(session.user.role)) {
+    return {
+      response: NextResponse.json(
+        {
+          error: {
+            code: "UNAUTHORIZED",
+            message: "You must be signed in as staff.",
+          },
+        },
+        { status: 401 }
+      ),
+    };
+  }
+  return { session };
+}
+
+/**
+ * Page/layout counterpart of `requireStaff`, for admin server components (Phase
+ * E.1). Redirects to `/admin/login` when the visitor is unauthenticated or not
+ * staff; otherwise returns the verified staff session. Used by the admin shell
+ * layout as defense-in-depth on top of the middleware gate.
+ */
+export async function requireStaffPage(): Promise<Session> {
+  const session = await auth();
+  if (!session?.user || !isStaff(session.user.role)) {
+    redirect("/admin/login");
+  }
+  return session;
 }
