@@ -15,6 +15,7 @@ import {
   Package,
   Settings,
   ShoppingBag,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 
@@ -59,6 +60,12 @@ const NAV_ITEMS: NavItem[] = [
     href: "/admin/products",
     icon: Package,
     isActive: (pathname) => pathname.startsWith("/admin/products"),
+  },
+  {
+    label: "Customers",
+    href: "/admin/customers",
+    icon: Users,
+    isActive: (pathname) => pathname.startsWith("/admin/customers"),
   },
   {
     label: "Manufacturing",
