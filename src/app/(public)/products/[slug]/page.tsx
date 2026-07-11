@@ -38,17 +38,52 @@ export default async function ProductDetailPage({ params }: Props) {
   const isPriceTbd = Number(product.basePrice) === 0;
   // Ordered { label, value }[] — array order is preserved by jsonb (fixes B.2).
   const specs = normalizeSpecs(product.specifications);
+  // Gallery: primary first, then the rest by sort order (already sorted by the
+  // service). Empty → the SVG placeholder hero.
+  const [hero, ...moreImages] = [...product.images].sort(
+    (a, b) => Number(b.isPrimary) - Number(a.isPrimary),
+  );
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-16 sm:py-24">
       {/* Above the fold: placeholder left (60%), product info right (40%) */}
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-5 lg:gap-16">
         <div className="lg:col-span-3">
-          <RobotPlaceholder
-            slug={product.slug}
-            name={product.name}
-            variant="hero"
-          />
+          {hero ? (
+            <div className="space-y-3">
+              <div className="aspect-square overflow-hidden rounded-2xl bg-neutral-50">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={hero.url}
+                  alt={hero.altText ?? product.name}
+                  className="size-full object-cover"
+                />
+              </div>
+              {moreImages.length > 0 && (
+                <div className="grid grid-cols-4 gap-3">
+                  {moreImages.map((img) => (
+                    <div
+                      key={img.id}
+                      className="aspect-square overflow-hidden rounded-xl bg-neutral-50"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={img.url}
+                        alt={img.altText ?? product.name}
+                        className="size-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <RobotPlaceholder
+              slug={product.slug}
+              name={product.name}
+              variant="hero"
+            />
+          )}
         </div>
 
         <div className="lg:col-span-2">

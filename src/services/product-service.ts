@@ -33,6 +33,8 @@ export type ProductCard = {
   isFeatured: boolean;
   categoryName: string;
   stockQuantity: number;
+  /** Primary image URL, or null → the card falls back to the SVG placeholder. */
+  primaryImageUrl: string | null;
   updatedAt: Date;
 };
 
@@ -85,17 +87,24 @@ const cardSelect = {
   stockQuantity: true,
   updatedAt: true,
   category: { select: { name: true } },
+  // Primary image (else lowest-sorted) for the card thumbnail.
+  images: {
+    orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }],
+    take: 1,
+    select: { url: true },
+  },
 } satisfies Prisma.ProductSelect;
 
 type CardRow = Prisma.ProductGetPayload<{ select: typeof cardSelect }>;
 
 function toCard(row: CardRow): ProductCard {
-  const { category, basePrice, ...rest } = row;
+  const { category, basePrice, images, ...rest } = row;
   return {
     ...rest,
     basePrice: basePrice.toFixed(2),
     currency: "BDT",
     categoryName: category.name,
+    primaryImageUrl: images[0]?.url ?? null,
   };
 }
 

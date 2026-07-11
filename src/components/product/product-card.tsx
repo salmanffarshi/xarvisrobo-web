@@ -16,11 +16,22 @@ export function ProductCard({ product }: { product: ProductCardData }) {
       className="group block rounded-2xl border border-neutral-200 bg-white transition-transform hover:-translate-y-0.5 hover:shadow-md"
     >
       <div className="relative p-3">
-        <RobotPlaceholder
-          slug={product.slug}
-          name={product.name}
-          variant="card"
-        />
+        {product.primaryImageUrl ? (
+          <div className="aspect-square overflow-hidden rounded-xl bg-neutral-50">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={product.primaryImageUrl}
+              alt={product.name}
+              className="size-full object-cover"
+            />
+          </div>
+        ) : (
+          <RobotPlaceholder
+            slug={product.slug}
+            name={product.name}
+            variant="card"
+          />
+        )}
         {product.isFeatured && (
           <Badge className="absolute right-5 top-5">Featured</Badge>
         )}
