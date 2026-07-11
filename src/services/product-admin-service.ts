@@ -103,6 +103,7 @@ export class ProductHasOrdersError extends Error {
 export interface AdminProductFilters {
   search?: string;
   categoryId?: string;
+  isActive?: boolean;
   page?: number;
   limit?: number;
 }
@@ -117,6 +118,7 @@ export async function list(
 
   const where: Prisma.ProductWhereInput = {
     ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
+    ...(filters.isActive !== undefined ? { isActive: filters.isActive } : {}),
     ...(search
       ? {
           OR: [

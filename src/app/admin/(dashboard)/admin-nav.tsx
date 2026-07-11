@@ -12,6 +12,7 @@ import {
   CreditCard,
   Factory,
   LayoutDashboard,
+  Package,
   Settings,
   ShoppingBag,
   type LucideIcon,
@@ -52,6 +53,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: CreditCard,
     isActive: (pathname, status) =>
       pathname.startsWith("/admin/orders") && status === PAYMENTS_STATUS,
+  },
+  {
+    label: "Products",
+    href: "/admin/products",
+    icon: Package,
+    isActive: (pathname) => pathname.startsWith("/admin/products"),
   },
   {
     label: "Manufacturing",

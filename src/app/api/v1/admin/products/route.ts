@@ -15,10 +15,13 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const search = searchParams.get("search")?.trim() || undefined;
   const categoryId = searchParams.get("categoryId") || undefined;
+  const statusParam = searchParams.get("status");
+  const isActive =
+    statusParam === "active" ? true : statusParam === "inactive" ? false : undefined;
   const pageRaw = Number(searchParams.get("page"));
   const page = Number.isInteger(pageRaw) && pageRaw > 1 ? pageRaw : 1;
 
-  const result = await list({ search, categoryId, page });
+  const result = await list({ search, categoryId, isActive, page });
   return NextResponse.json(result);
 }
 
