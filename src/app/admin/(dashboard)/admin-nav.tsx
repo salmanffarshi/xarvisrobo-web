@@ -12,6 +12,7 @@ import {
   CreditCard,
   Factory,
   LayoutDashboard,
+  Settings,
   ShoppingBag,
   type LucideIcon,
 } from "lucide-react";
@@ -57,6 +58,12 @@ const NAV_ITEMS: NavItem[] = [
     href: "/admin/manufacturing",
     icon: Factory,
     isActive: (pathname) => pathname.startsWith("/admin/manufacturing"),
+  },
+  {
+    label: "Settings",
+    href: "/admin/settings",
+    icon: Settings,
+    isActive: (pathname) => pathname.startsWith("/admin/settings"),
   },
 ];
 
