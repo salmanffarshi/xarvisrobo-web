@@ -87,6 +87,11 @@ enum NotificationChannel {
   IN_APP
 }
 
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
 // ============================================================================
 // USER & AUTH
 // ============================================================================
@@ -302,6 +307,11 @@ model Order {
   deliveryZone   DeliveryZone // explicit customer radio at checkout (ADR-016)
   subtotal       Decimal       @db.Decimal(10, 2)
   deliveryCharge Decimal       @default(0) @db.Decimal(10, 2) // COD: ৳60 inside / ৳130 outside; prepaid: 0
+  // Coupon snapshot (Phase E.5). Set at placement if a valid coupon was applied;
+  // frozen thereafter so editing/deleting the coupon never mutates a past order.
+  couponCode     String? // normalized (UPPERCASE) code used at placement
+  couponId       String? // the Coupon.id redeemed (snapshot, not a live FK)
+  discountAmount Decimal       @default(0) @db.Decimal(10, 2) // subtotal-only discount; 0 if no coupon
   total          Decimal       @db.Decimal(10, 2)
   currency       String        @default("BDT")
   // Set once at placement to dedupe double-submits.
@@ -495,4 +505,45 @@ model Settings {
   codOutsideDhaka    Int
   paymentGeneralNote String?
   updatedAt          DateTime @updatedAt
+}
+
+// ============================================================================
+// COUPONS (Phase E.5)
+// ============================================================================
+
+// A discount coupon. Applied to the order SUBTOTAL only (never delivery, per
+// ADR-017). The discount is always recomputed server-side (ADR-005); the code
+// is stored UPPERCASE and matched case-insensitively.
+model Coupon {
+  id               String       @id @default(cuid())
+  code             String       @unique // stored UPPERCASE; matched case-insensitively
+  description      String?
+  discountType     DiscountType
+  discountValue    Decimal      @db.Decimal(10, 2) // percent (e.g. 10.00) or fixed BDT (e.g. 200.00)
+  minOrderAmount   Decimal      @default(0) @db.Decimal(10, 2) // min SUBTOTAL to qualify
+  totalUsageLimit  Int? // null = unlimited total redemptions
+  perCustomerLimit Int? // null = unlimited per customer
+  validFrom        DateTime?
+  validUntil       DateTime? // expiry
+  isActive         Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  redemptions CouponRedemption[]
+}
+
+// One row per coupon redemption — created atomically inside the order-placement
+// transaction (Phase E.5). orderId is unique: at most one redemption per order.
+model CouponRedemption {
+  id             String   @id @default(cuid())
+  couponId       String
+  userId         String
+  orderId        String   @unique // one redemption per order
+  discountAmount Decimal  @db.Decimal(10, 2)
+  createdAt      DateTime @default(now())
+
+  coupon Coupon @relation(fields: [couponId], references: [id])
+
+  @@index([couponId, userId])
+  @@index([couponId])
 }
