@@ -22,11 +22,16 @@ type SignatureBundle = {
 };
 
 /**
- * Validate + upload one image file to Cloudinary. Resolves to the stored
- * secure URL. Throws an Error with a friendly, user-facing message on any
- * failure (bad type/size, signature fetch, or Cloudinary rejection).
+ * Validate + upload one image file to Cloudinary via a signature from
+ * `signEndpoint`. Resolves to the stored secure URL. Throws an Error with a
+ * friendly, user-facing message on any failure (bad type/size, signature fetch,
+ * or Cloudinary rejection). The server re-validates the returned URL's folder
+ * before storing it, so these client checks are UX, not the security boundary.
  */
-export async function uploadPaymentProof(file: File): Promise<{ url: string }> {
+async function uploadImage(
+  file: File,
+  signEndpoint: string,
+): Promise<{ url: string }> {
   // 1. Client-side guards (friendly errors; the server re-checks the URL).
   if (!ACCEPTED_IMAGE_TYPES.includes(file.type as never)) {
     throw new Error("Please choose a JPG, PNG, or WebP image.");
@@ -35,10 +40,8 @@ export async function uploadPaymentProof(file: File): Promise<{ url: string }> {
     throw new Error("That image is larger than 5MB. Please choose a smaller one.");
   }
 
-  // 2. Ask our server for a signature scoped to the payment-proofs folder.
-  const signRes = await fetch("/api/v1/uploads/payment-proof/sign", {
-    method: "POST",
-  });
+  // 2. Ask our server for a signature scoped to the target folder.
+  const signRes = await fetch(signEndpoint, { method: "POST" });
   if (!signRes.ok) {
     throw new Error("Couldn't start the upload. Please try again.");
   }
@@ -68,4 +71,14 @@ export async function uploadPaymentProof(file: File): Promise<{ url: string }> {
   }
 
   return { url: data.secure_url };
+}
+
+/** Upload a customer payment-proof screenshot (payment-proofs folder). */
+export function uploadPaymentProof(file: File): Promise<{ url: string }> {
+  return uploadImage(file, "/api/v1/uploads/payment-proof/sign");
+}
+
+/** Upload a product image (products folder, staff-only endpoint). */
+export function uploadProductImage(file: File): Promise<{ url: string }> {
+  return uploadImage(file, "/api/v1/uploads/product-image/sign");
 }

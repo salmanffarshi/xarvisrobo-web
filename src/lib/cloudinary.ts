@@ -13,10 +13,17 @@ import "server-only";
 
 import { v2 as cloudinary } from "cloudinary";
 
-// Every payment proof lands in this one folder. The signature commits to it,
-// and isOwnCloudinaryUrl() checks for it — so a client can't upload elsewhere
-// on our cloud, and can't hand us back a URL from some other folder/host.
+// Uploads are scoped to a fixed allowlist of folders. The signature commits to
+// the folder, and isOwnCloudinaryUrl() checks for it — so a client can't upload
+// elsewhere on our cloud, and can't hand us back a URL from another folder/host.
+// The folder is chosen server-side by each sign endpoint (never by the client),
+// and the UploadFolder type prevents signing an arbitrary path.
 export const PAYMENT_PROOFS_FOLDER = "payment-proofs";
+export const PRODUCT_IMAGES_FOLDER = "products";
+
+export type UploadFolder =
+  | typeof PAYMENT_PROOFS_FOLDER
+  | typeof PRODUCT_IMAGES_FOLDER;
 
 const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
 const apiKey = process.env.CLOUDINARY_API_KEY;
@@ -45,15 +52,16 @@ export type UploadSignature = {
 
 /**
  * Generate a signature the browser uses to upload one file directly to
- * Cloudinary. The signed params (folder + timestamp) are exactly what the
- * client must send with the upload — Cloudinary recomputes the signature from
- * them and rejects the upload if anything was tampered with. The API secret
- * is used only here, server-side, and is never returned.
+ * Cloudinary, scoped to `folder`. The signed params (folder + timestamp) are
+ * exactly what the client must send with the upload — Cloudinary recomputes the
+ * signature from them and rejects the upload if anything was tampered with. The
+ * API secret is used only here, server-side, and is never returned. The folder
+ * is always chosen by the (guarded) sign endpoint, never by the client.
  */
-export function generateUploadSignature(): UploadSignature {
+export function generateUploadSignature(folder: UploadFolder): UploadSignature {
   const timestamp = Math.round(Date.now() / 1000);
   const paramsToSign = {
-    folder: PAYMENT_PROOFS_FOLDER,
+    folder,
     timestamp,
   };
 
@@ -64,17 +72,17 @@ export function generateUploadSignature(): UploadSignature {
     timestamp,
     apiKey: apiKey!,
     cloudName: cloudName!,
-    folder: PAYMENT_PROOFS_FOLDER,
+    folder,
   };
 }
 
 /**
  * True only if `url` is a Cloudinary secure URL on OUR cloud AND under the
- * payment-proofs folder. A client returns the uploaded URL to us; we must not
- * store an arbitrary URL it could send instead (e.g. an off-cloud image, or a
- * different folder). Parsed with the URL API so string tricks can't slip past.
+ * given `folder`. A client returns the uploaded URL to us; we must not store an
+ * arbitrary URL it could send instead (e.g. an off-cloud image, or a different
+ * folder). Parsed with the URL API so string tricks can't slip past.
  */
-export function isOwnCloudinaryUrl(url: string): boolean {
+export function isOwnCloudinaryUrl(url: string, folder: UploadFolder): boolean {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -84,9 +92,9 @@ export function isOwnCloudinaryUrl(url: string): boolean {
 
   if (parsed.protocol !== "https:") return false;
   if (parsed.hostname !== "res.cloudinary.com") return false;
-  // Path is /<cloudName>/image/upload/.../payment-proofs/<file>
+  // Path is /<cloudName>/image/upload/.../<folder>/<file>
   if (!parsed.pathname.startsWith(`/${cloudName}/`)) return false;
-  if (!parsed.pathname.includes(`/${PAYMENT_PROOFS_FOLDER}/`)) return false;
+  if (!parsed.pathname.includes(`/${folder}/`)) return false;
 
   return true;
 }

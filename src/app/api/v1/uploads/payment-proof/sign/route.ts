@@ -5,11 +5,11 @@
 import { NextResponse } from "next/server";
 
 import { requireCustomer } from "@/lib/auth-guards";
-import { generateUploadSignature } from "@/lib/cloudinary";
+import { PAYMENT_PROOFS_FOLDER, generateUploadSignature } from "@/lib/cloudinary";
 
 export async function POST() {
   const guard = await requireCustomer();
   if (guard.response) return guard.response;
 
-  return NextResponse.json(generateUploadSignature());
+  return NextResponse.json(generateUploadSignature(PAYMENT_PROOFS_FOLDER));
 }

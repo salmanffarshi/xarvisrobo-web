@@ -12,7 +12,7 @@
 // nonexistent orderNumber both surface as ORDER_NOT_FOUND (no info leak).
 
 import { db } from "@/lib/db";
-import { isOwnCloudinaryUrl } from "@/lib/cloudinary";
+import { PAYMENT_PROOFS_FOLDER, isOwnCloudinaryUrl } from "@/lib/cloudinary";
 import {
   submitProofSchema,
   type SubmitProofInput,
@@ -64,7 +64,10 @@ export async function submitPaymentProof(
   // Validate a supplied screenshot URL BEFORE opening the transaction — a URL
   // that isn't on our cloud/folder is a client trying to store an arbitrary
   // link, and there's no DB work to do if it fails.
-  if (parsed.screenshotUrl && !isOwnCloudinaryUrl(parsed.screenshotUrl)) {
+  if (
+    parsed.screenshotUrl &&
+    !isOwnCloudinaryUrl(parsed.screenshotUrl, PAYMENT_PROOFS_FOLDER)
+  ) {
     throw new InvalidScreenshotError();
   }
 
