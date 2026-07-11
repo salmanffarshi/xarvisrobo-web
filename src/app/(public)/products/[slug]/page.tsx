@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { Prisma } from "@prisma/client";
 
 import { AddToCartButton } from "@/components/product/add-to-cart-button";
 import { RobotPlaceholder } from "@/components/product/robot-placeholder";
 import { Badge } from "@/components/ui/badge";
 import { formatBdt } from "@/lib/format";
+import { normalizeSpecs } from "@/lib/product-specs";
 import * as productService from "@/services/product-service";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -30,25 +30,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-/** specifications is free-form JSON; only a plain object renders as a table. */
-function specEntries(value: Prisma.JsonValue): [string, string][] {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
-  return Object.entries(value).map(([key, val]) => [key, String(val)]);
-}
-
-/** "battery life" → "Battery Life"; keys already containing capitals pass through. */
-function titleCase(key: string): string {
-  if (key !== key.toLowerCase()) return key;
-  return key.replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
 export default async function ProductDetailPage({ params }: Props) {
   const { slug } = await params;
   const product = await productService.getBySlug(slug);
   if (!product) notFound();
 
   const isPriceTbd = Number(product.basePrice) === 0;
-  const specs = specEntries(product.specifications);
+  // Ordered { label, value }[] — array order is preserved by jsonb (fixes B.2).
+  const specs = normalizeSpecs(product.specifications);
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-16 sm:py-24">
@@ -117,15 +106,15 @@ export default async function ProductDetailPage({ params }: Props) {
               Specifications
             </h2>
             <dl className="mt-6 overflow-hidden rounded-2xl border border-neutral-200">
-              {specs.map(([key, value]) => (
+              {specs.map((spec, i) => (
                 <div
-                  key={key}
+                  key={`${spec.label}-${i}`}
                   className="grid grid-cols-1 gap-1 px-5 py-3.5 odd:bg-neutral-50 sm:grid-cols-[200px_1fr] sm:gap-4"
                 >
                   <dt className="text-sm font-medium text-neutral-900">
-                    {titleCase(key)}
+                    {spec.label}
                   </dt>
-                  <dd className="text-sm text-neutral-600">{value}</dd>
+                  <dd className="text-sm text-neutral-600">{spec.value}</dd>
                 </div>
               ))}
             </dl>
