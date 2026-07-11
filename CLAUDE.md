@@ -144,6 +144,7 @@ Update this list as each phase completes. Also append a one-line note to `docs/p
 - [x] Phase E.2.1 — 2026-07-10 — admin order list (filterable) + read-only order detail (payment proof, history), admin labels, wired dashboard cards. Next: E.2.2 order actions (verify/reject payment, confirm COD, advance status, cancel).
 - [x] Phase E.2.2 — 2026-07-10 — order action layer: verify/reject payment, COD confirm, guided status advance, cancel; Manufacturing created at gates; Phase E.2 complete
 - [x] Phase E.3 — 2026-07-11 — manufacturing kanban board (stage moves fwd/back, notes), independent of order status
+- [x] Phase E.4 — 2026-07-11 — editable settings (payment/WhatsApp/COD, DB-backed Settings singleton), product+category management (CRUD, Cloudinary image uploads, specs-order fix → ordered array), customer management (list/search, notes, deactivate). Three parts A/B/C.
 - [ ] Phase E — admin dashboard (products, payments, orders, customers, manufacturing)
 - [ ] Phase F — notifications (email + SMS) + invoices
 - [ ] Phase G — pre-launch (security review, deploy)
