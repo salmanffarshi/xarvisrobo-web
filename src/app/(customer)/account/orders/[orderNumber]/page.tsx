@@ -8,6 +8,7 @@ import { formatBdt } from "@/lib/format";
 import { ORDER_STATUS_LABELS, statusTone } from "@/lib/order-status";
 import { cn } from "@/lib/utils";
 import { getOrderForCustomer } from "@/services/order-service";
+import { getSettings } from "@/services/settings-service";
 import { Badge } from "@/components/ui/badge";
 import { OrderStatusTracker } from "@/components/order/order-status-tracker";
 import { OrderActionBlock } from "@/components/order/order-action-block";
@@ -44,6 +45,10 @@ export default async function OrderDetailPage({
   if (!order) {
     notFound();
   }
+
+  // Payment-receiving details + WhatsApp number for the action block, from the
+  // admin-editable Settings row (Phase E.4).
+  const settings = await getSettings();
 
   const orderDate = new Intl.DateTimeFormat("en-GB", {
     dateStyle: "long",
@@ -143,7 +148,7 @@ export default async function OrderDetailPage({
 
         {/* Payment / action block (Phase D.2) — gated: renders only for
             actionable states, nothing otherwise (cancelled/delivered/etc). */}
-        <OrderActionBlock order={order} />
+        <OrderActionBlock order={order} settings={settings} />
 
         {/* Shipping address (frozen snapshot — ADR-004) + contact */}
         <div className="rounded-2xl border border-neutral-200 p-6">

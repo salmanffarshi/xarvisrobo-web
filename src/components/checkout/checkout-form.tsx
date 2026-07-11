@@ -102,9 +102,13 @@ function SectionHeading({ step, title }: { step: number; title: string }) {
 export function CheckoutForm({
   addresses: initialAddresses,
   profilePhone,
+  codCharges,
 }: {
   addresses: AddressData[];
   profilePhone: string | null;
+  // The two COD charge NUMBERS from the Settings row, so this live display uses
+  // exactly what the server will compute at placement (ADR-016).
+  codCharges: { insideDhaka: number; outsideDhaka: number };
 }) {
   const router = useRouter();
   const { items, subtotal } = useCart();
@@ -140,7 +144,11 @@ export function CheckoutForm({
   // Same helper the server uses at placement (ADR-016), so this displayed
   // charge always matches what gets stored. Recomputes whenever the method or
   // the zone radio changes.
-  const deliveryCharge = computeDeliveryCharge(paymentMethod, deliveryZone);
+  const deliveryCharge = computeDeliveryCharge(
+    paymentMethod,
+    deliveryZone,
+    codCharges,
+  );
   const total = sumMoney([subtotal, deliveryCharge]);
 
   function selectAddress(address: AddressData) {
@@ -397,7 +405,7 @@ export function CheckoutForm({
                           )}
                         >
                           {isCod
-                            ? `+ ${formatBdt(computeDeliveryCharge("COD", deliveryZone))} delivery charge`
+                            ? `+ ${formatBdt(computeDeliveryCharge("COD", deliveryZone, codCharges))} delivery charge`
                             : "Free delivery"}
                         </span>
                       </span>

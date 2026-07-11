@@ -471,3 +471,28 @@ model ContactMessage {
 
   @@index([isResolved])
 }
+
+// ============================================================================
+// SETTINGS (Phase E.4 Part A)
+// ============================================================================
+
+// Admin-editable store settings, DB-backed. Exactly one row: `id` defaults to
+// the literal "singleton", so a second insert collides on the primary key.
+// These are the runtime source of truth for payment-receiving details, the
+// WhatsApp handoff number, and the two COD delivery charges (the delivery-charge
+// LOGIC stays in code per ADR-016 — only the two NUMBERS live here). Seeded from
+// src/config/payment.ts defaults so behavior is unchanged until an admin edits.
+model Settings {
+  id                 String   @id @default("singleton")
+  bkashNumber        String
+  bkashType          String // "personal" | "merchant"
+  bkashInstructions  String?
+  nagadNumber        String
+  nagadType          String
+  nagadInstructions  String?
+  whatsappNumber     String
+  codInsideDhaka     Int
+  codOutsideDhaka    Int
+  paymentGeneralNote String?
+  updatedAt          DateTime @updatedAt
+}

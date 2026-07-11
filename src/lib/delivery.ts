@@ -9,10 +9,6 @@
 // No float math: the constants are whole taka; formatting an integer to 2dp
 // is exact, so the decimal strings ("0.00" / "60.00" / "130.00") are precise.
 
-import {
-  COD_DELIVERY_INSIDE_DHAKA,
-  COD_DELIVERY_OUTSIDE_DHAKA,
-} from "@/config/payment";
 import type { DeliveryZone, PaymentMethod } from "@prisma/client";
 
 /** Customer-facing zone labels, from the stored enum (ADR-016). */
@@ -21,22 +17,31 @@ export const DELIVERY_ZONE_LABELS: Record<DeliveryZone, string> = {
   OUTSIDE_DHAKA: "Outside Dhaka",
 };
 
+/** The two whole-taka COD charges, read from the Settings row (Phase E.4). */
+export type CodCharges = {
+  insideDhaka: number;
+  outsideDhaka: number;
+};
+
 /**
- * Delivery charge as a 2dp decimal string, from payment method + chosen zone:
+ * Delivery charge as a 2dp decimal string, from payment method + chosen zone.
+ * The LOGIC is fixed (ADR-016); only the two COD NUMBERS are supplied by the
+ * caller (from the Settings row):
  * - prepaid (BKASH/NAGAD) → "0.00" (free everywhere)
- * - COD + INSIDE_DHAKA  → "60.00"
- * - COD + OUTSIDE_DHAKA → "130.00"
+ * - COD + INSIDE_DHAKA  → insideDhaka
+ * - COD + OUTSIDE_DHAKA → outsideDhaka
  */
 export function computeDeliveryCharge(
   paymentMethod: PaymentMethod,
   deliveryZone: DeliveryZone,
+  charges: CodCharges,
 ): string {
   if (paymentMethod !== "COD") {
     return "0.00";
   }
   const charge =
     deliveryZone === "INSIDE_DHAKA"
-      ? COD_DELIVERY_INSIDE_DHAKA
-      : COD_DELIVERY_OUTSIDE_DHAKA;
+      ? charges.insideDhaka
+      : charges.outsideDhaka;
   return charge.toFixed(2);
 }

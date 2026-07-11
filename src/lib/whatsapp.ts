@@ -6,7 +6,6 @@
 // them to do exactly that. Neither link changes any order state; they are pure
 // convenience handoffs (COD confirmation is a Phase E admin action).
 
-import { WHATSAPP_NUMBER } from "@/config/payment";
 import { formatBdt } from "@/lib/format";
 import { DELIVERY_ZONE_LABELS } from "@/lib/delivery";
 import type { OrderDetailView } from "@/types/order";
@@ -17,9 +16,16 @@ const METHOD_LABELS: Record<"BKASH" | "NAGAD", string> = {
   NAGAD: "Nagad",
 };
 
-/** Build a WhatsApp click-to-chat URL to the business number. */
-export function buildWhatsAppUrl(message: string): string {
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+/**
+ * Build a WhatsApp click-to-chat URL to the business number. The number comes
+ * from the Settings row (Phase E.4), passed by the caller — international
+ * format, digits only, as wa.me requires.
+ */
+export function buildWhatsAppUrl(
+  whatsappNumber: string,
+  message: string,
+): string {
+  return `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
 }
 
 /** Prepaid: the customer says they've paid and will attach the screenshot. */

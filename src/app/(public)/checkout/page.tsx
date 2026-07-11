@@ -7,6 +7,7 @@ import { isCustomer } from "@/lib/permissions";
 import { getProfile } from "@/services/account-service";
 import { list as listAddresses } from "@/services/address-service";
 import { getCart } from "@/services/cart-service";
+import { getSettings } from "@/services/settings-service";
 import { CheckoutForm } from "@/components/checkout/checkout-form";
 import { Button } from "@/components/ui/button";
 
@@ -26,10 +27,11 @@ export default async function CheckoutPage() {
   }
   const userId = session.user.id;
 
-  const [cart, addresses, profile] = await Promise.all([
+  const [cart, addresses, profile, settings] = await Promise.all([
     getCart(userId),
     listAddresses(userId),
     getProfile(userId),
+    getSettings(),
   ]);
 
   if (cart.items.length === 0) {
@@ -66,6 +68,10 @@ export default async function CheckoutPage() {
           isDefault: address.isDefault,
         }))}
         profilePhone={profile.phone}
+        codCharges={{
+          insideDhaka: settings.codInsideDhaka,
+          outsideDhaka: settings.codOutsideDhaka,
+        }}
       />
     </div>
   );

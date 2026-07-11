@@ -1,6 +1,31 @@
 import { PrismaClient } from "@prisma/client";
 
+import {
+  COD_DELIVERY_INSIDE_DHAKA,
+  COD_DELIVERY_OUTSIDE_DHAKA,
+  WHATSAPP_NUMBER,
+  paymentGeneralNote,
+  paymentReceivingDetails,
+} from "../src/config/payment";
+
 const prisma = new PrismaClient();
+
+// The single Settings row (id="singleton"), seeded from the config defaults so
+// the DB-backed values match what the site used before Phase E.4. Idempotent
+// and non-destructive: `create` runs only on a fresh DB; on a re-seed the
+// `update` is a no-op, so admin edits made through the Settings page survive.
+const settingsDefaults = {
+  bkashNumber: paymentReceivingDetails.BKASH.number,
+  bkashType: paymentReceivingDetails.BKASH.accountType,
+  bkashInstructions: paymentReceivingDetails.BKASH.instructions ?? null,
+  nagadNumber: paymentReceivingDetails.NAGAD.number,
+  nagadType: paymentReceivingDetails.NAGAD.accountType,
+  nagadInstructions: paymentReceivingDetails.NAGAD.instructions ?? null,
+  whatsappNumber: WHATSAPP_NUMBER,
+  codInsideDhaka: COD_DELIVERY_INSIDE_DHAKA,
+  codOutsideDhaka: COD_DELIVERY_OUTSIDE_DHAKA,
+  paymentGeneralNote,
+};
 
 const categories = [
   {
@@ -106,8 +131,14 @@ async function main() {
     });
   }
 
+  await prisma.settings.upsert({
+    where: { id: "singleton" },
+    create: { id: "singleton", ...settingsDefaults },
+    update: {},
+  });
+
   console.log(
-    `[seed] ${categories.length} categories, ${products.length} products seeded.`
+    `[seed] ${categories.length} categories, ${products.length} products, 1 settings row seeded.`
   );
 }
 

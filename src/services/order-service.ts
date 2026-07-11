@@ -32,6 +32,7 @@ import { db } from "@/lib/db";
 import { computeDeliveryCharge } from "@/lib/delivery";
 import { multiplyMoney, sumMoney } from "@/lib/money";
 import { generateOrderNumber } from "@/lib/order-number";
+import { getSettings } from "@/services/settings-service";
 import {
   placeOrderSchema,
   type PlaceOrderInput,
@@ -113,6 +114,15 @@ export async function placeOrder(
     return { orderNumber: existing.orderNumber };
   }
 
+  // COD charge numbers come from the admin-editable Settings row (Phase E.4);
+  // the charge is still computed server-side (ADR-005) — only the two NUMBERS
+  // moved out of config. Read once, outside the retry loop.
+  const settings = await getSettings();
+  const codCharges = {
+    insideDhaka: settings.codInsideDhaka,
+    outsideDhaka: settings.codOutsideDhaka,
+  };
+
   for (let attempt = 1; attempt <= MAX_ORDER_NUMBER_ATTEMPTS; attempt++) {
     const candidateOrderNumber = generateOrderNumber();
     try {
@@ -175,6 +185,7 @@ export async function placeOrder(
         const deliveryCharge = computeDeliveryCharge(
           parsed.paymentMethod,
           parsed.deliveryZone,
+          codCharges,
         );
         const total = sumMoney([subtotal, deliveryCharge]);
 

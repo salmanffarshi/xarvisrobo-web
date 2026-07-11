@@ -13,12 +13,8 @@
 // the proof form only what it needs. WhatsApp links change no order state.
 
 import { MessageCircle } from "lucide-react";
+import type { Settings } from "@prisma/client";
 
-import {
-  paymentGeneralNote,
-  paymentReceivingDetails,
-  type PrepaidMethod,
-} from "@/config/payment";
 import { DELIVERY_ZONE_LABELS } from "@/lib/delivery";
 import { formatBdt } from "@/lib/format";
 import {
@@ -60,24 +56,29 @@ function WhatsAppButton({ href, label }: { href: string; label: string }) {
   );
 }
 
-/** Receiving-account details for a prepaid method (bKash / Nagad). */
-function PrepaidInstructions({ order }: { order: OrderDetailView }) {
-  const method = order.paymentMethod as PrepaidMethod;
-  const details = paymentReceivingDetails[method];
+/** Receiving-account details for a prepaid method (bKash / Nagad). Values come
+ * from the admin-editable Settings row (Phase E.4), not config. */
+function PrepaidInstructions({
+  order,
+  settings,
+}: {
+  order: OrderDetailView;
+  settings: Settings;
+}) {
+  const isBkash = order.paymentMethod === "BKASH";
+  const number = isBkash ? settings.bkashNumber : settings.nagadNumber;
+  const accountType = isBkash ? settings.bkashType : settings.nagadType;
+  const instructions = isBkash
+    ? settings.bkashInstructions
+    : settings.nagadInstructions;
 
   return (
     <div className="space-y-3 text-sm text-neutral-600">
       <dl className="grid gap-x-6 gap-y-1.5 sm:grid-cols-[auto_1fr]">
-        <dt className="text-neutral-500">
-          {method === "BKASH" ? "bKash" : "Nagad"} number
-        </dt>
-        <dd className="font-medium tabular-nums text-neutral-900">
-          {details.number}
-        </dd>
+        <dt className="text-neutral-500">{isBkash ? "bKash" : "Nagad"} number</dt>
+        <dd className="font-medium tabular-nums text-neutral-900">{number}</dd>
         <dt className="text-neutral-500">Account type</dt>
-        <dd className="font-medium text-neutral-900 capitalize">
-          {details.accountType}
-        </dd>
+        <dd className="font-medium text-neutral-900 capitalize">{accountType}</dd>
         <dt className="text-neutral-500">Amount to send</dt>
         <dd className="font-medium tabular-nums text-neutral-900">
           {formatBdt(order.total)}
@@ -85,13 +86,19 @@ function PrepaidInstructions({ order }: { order: OrderDetailView }) {
         <dt className="text-neutral-500">Reference</dt>
         <dd className="font-medium text-neutral-900">{order.orderNumber}</dd>
       </dl>
-      {details.instructions && <p>{details.instructions}</p>}
-      <p>{paymentGeneralNote}</p>
+      {instructions && <p>{instructions}</p>}
+      {settings.paymentGeneralNote && <p>{settings.paymentGeneralNote}</p>}
     </div>
   );
 }
 
-export function OrderActionBlock({ order }: { order: OrderDetailView }) {
+export function OrderActionBlock({
+  order,
+  settings,
+}: {
+  order: OrderDetailView;
+  settings: Settings;
+}) {
   const { paymentMethod, status } = order;
   const isPrepaid = paymentMethod !== "COD";
 
@@ -115,7 +122,7 @@ export function OrderActionBlock({ order }: { order: OrderDetailView }) {
               </p>
             </div>
           )}
-          <PrepaidInstructions order={order} />
+          <PrepaidInstructions order={order} settings={settings} />
           <div className="border-t border-neutral-100 pt-6">
             <p className="mb-4 text-sm text-neutral-600">
               Once you&apos;ve sent the payment, enter the details below so we
@@ -123,7 +130,10 @@ export function OrderActionBlock({ order }: { order: OrderDetailView }) {
             </p>
             <PaymentProofForm
               orderNumber={order.orderNumber}
-              whatsappUrl={buildWhatsAppUrl(prepaidProofMessage(order))}
+              whatsappUrl={buildWhatsAppUrl(
+                settings.whatsappNumber,
+                prepaidProofMessage(order),
+              )}
             />
           </div>
         </div>
@@ -168,7 +178,10 @@ export function OrderActionBlock({ order }: { order: OrderDetailView }) {
           )}
           <div className="pt-1">
             <WhatsAppButton
-              href={buildWhatsAppUrl(prepaidProofMessage(order))}
+              href={buildWhatsAppUrl(
+                settings.whatsappNumber,
+                prepaidProofMessage(order),
+              )}
               label="Send your screenshot on WhatsApp"
             />
           </div>
@@ -192,7 +205,10 @@ export function OrderActionBlock({ order }: { order: OrderDetailView }) {
             {DELIVERY_ZONE_LABELS[order.deliveryZone]}) is payable on delivery.
           </p>
           <WhatsAppButton
-            href={buildWhatsAppUrl(codConfirmMessage(order))}
+            href={buildWhatsAppUrl(
+              settings.whatsappNumber,
+              codConfirmMessage(order),
+            )}
             label="Confirm on WhatsApp"
           />
         </div>

@@ -1,12 +1,16 @@
-// REPLACE BEFORE LAUNCH — every PLACEHOLDER_* value below must be swapped for
-// the real receiving account details before real customers use the site.
+// SEED DEFAULTS ONLY (Phase E.4 Part A) — nothing at runtime reads these.
 //
-// Payment receiving details shown to customers on the order confirmation page
-// (Phase C.2). Single source of truth: the confirmation page reads from here,
-// and Phase E makes these admin-editable. These are public-facing (customers
-// must see them to pay) — they are not secrets, but keep them accurate.
-// COD delivery charge depends on the customer's chosen zone (ADR-016):
-// prepaid is free everywhere; COD is ৳60 inside Dhaka, ৳130 outside.
+// As of Phase E.4, the payment-receiving details, WhatsApp number, and the two
+// COD delivery charges live in the admin-editable Settings row (one per store).
+// This file is now ONLY the source of the initial values for that row: the seed
+// (prisma/seed.ts) writes them on a fresh DB, and settings-service uses them to
+// self-heal a missing singleton. Editing a value here changes only what a fresh
+// seed would create — it does NOT change what the live site shows. To change the
+// live site, edit the values in /admin/settings.
+//
+// COD delivery charge depends on the customer's chosen zone (ADR-016): prepaid
+// is free everywhere; COD is ৳60 inside Dhaka, ৳130 outside (these two numbers
+// are the seed defaults for Settings.codInsideDhaka / codOutsideDhaka).
 
 export const CURRENCY = "BDT";
 export const COD_DELIVERY_INSIDE_DHAKA = 60; // ADR-016
