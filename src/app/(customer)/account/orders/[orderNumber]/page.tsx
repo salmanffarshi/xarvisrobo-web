@@ -131,6 +131,14 @@ export default async function OrderDetailPage({
               <span className="text-neutral-600">Subtotal</span>
               <span className="tabular-nums">{formatBdt(order.subtotal)}</span>
             </div>
+            {order.discountAmount !== "0.00" && (
+              <div className="flex items-baseline justify-between text-emerald-700">
+                <span>Discount{order.couponCode ? ` (${order.couponCode})` : ""}</span>
+                <span className="tabular-nums">
+                  −{formatBdt(order.discountAmount)}
+                </span>
+              </div>
+            )}
             <div className="flex items-baseline justify-between">
               <span className="text-neutral-600">Delivery charge</span>
               <span className="tabular-nums">

@@ -21,12 +21,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { computeDeliveryCharge } from "@/lib/delivery";
 import { formatBdt } from "@/lib/format";
-import { sumMoney } from "@/lib/money";
+import { subtractMoney, sumMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import {
   placeOrderSchema,
@@ -122,6 +122,16 @@ export function CheckoutForm({
   // guarantee hinges on retries carrying the same key.
   const [idempotencyKey] = useState(() => crypto.randomUUID());
 
+  // Coupon (Phase E.5) — display only. The server re-validates + recomputes at
+  // placement (ADR-005); we send only the applied code, never the discount.
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    discount: string;
+  } | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
+
   const defaultAddress =
     initialAddresses.find((address) => address.isDefault) ??
     initialAddresses[0];
@@ -149,7 +159,50 @@ export function CheckoutForm({
     deliveryZone,
     codCharges,
   );
-  const total = sumMoney([subtotal, deliveryCharge]);
+  // Clamp the applied discount to the current subtotal for display — the cart
+  // may have changed since Apply. Placement recomputes authoritatively (ADR-005).
+  const discount = !appliedCoupon
+    ? "0.00"
+    : Number(appliedCoupon.discount) <= Number(subtotal)
+      ? appliedCoupon.discount
+      : subtotal;
+  const total = sumMoney([subtractMoney(subtotal, discount), deliveryCharge]);
+
+  async function applyCoupon() {
+    const code = couponInput.trim();
+    if (!code) return;
+    setApplyingCoupon(true);
+    setCouponError(null);
+    try {
+      const res = await fetch("/api/v1/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      const body:
+        | { valid: true; code: string; discount: string }
+        | { valid: false; message: string }
+        | null = await res.json().catch(() => null);
+
+      if (body && body.valid) {
+        setAppliedCoupon({ code: body.code, discount: body.discount });
+        setCouponInput("");
+        setCouponError(null);
+      } else {
+        setAppliedCoupon(null);
+        setCouponError(body?.message ?? "Could not apply that coupon.");
+      }
+    } catch {
+      setCouponError("Network error. Please try again.");
+    } finally {
+      setApplyingCoupon(false);
+    }
+  }
+
+  function removeCoupon() {
+    setAppliedCoupon(null);
+    setCouponError(null);
+  }
 
   function selectAddress(address: AddressData) {
     form.setValue("addressId", address.id, { shouldValidate: true });
@@ -191,10 +244,13 @@ export function CheckoutForm({
           deliveryNotes: values.deliveryNotes || undefined,
           paymentMethod: values.paymentMethod,
           deliveryZone: values.deliveryZone,
+          // Only the code — the server re-validates + recomputes (ADR-005).
+          couponCode: appliedCoupon?.code,
         }),
       });
-      const body: { orderNumber?: string; error?: { message?: string } } | null =
-        await res.json().catch(() => null);
+      const body:
+        | { orderNumber?: string; error?: { code?: string; message?: string } }
+        | null = await res.json().catch(() => null);
 
       if (res.status === 201 && body?.orderNumber) {
         // Keep the button disabled while navigating; refresh so the header
@@ -202,6 +258,13 @@ export function CheckoutForm({
         router.push(`/account/orders/${body.orderNumber}?placed=1`);
         router.refresh();
         return;
+      }
+
+      // Coupon became invalid between Apply and placement (e.g. a usage cap was
+      // hit by another order) — drop it so the summary updates, and surface why.
+      if (body?.error?.code === "COUPON_INVALID") {
+        setAppliedCoupon(null);
+        setCouponError(body.error.message ?? "That coupon is no longer valid.");
       }
 
       toast.error(
@@ -499,6 +562,59 @@ export function CheckoutForm({
               ))}
             </ul>
 
+            {/* Coupon (Phase E.5) */}
+            <div className="mt-4 border-t border-neutral-200 pt-4">
+              {appliedCoupon ? (
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-emerald-50 px-3 py-2 text-sm">
+                  <span className="min-w-0 truncate font-medium text-emerald-800">
+                    {appliedCoupon.code} applied
+                  </span>
+                  <button
+                    type="button"
+                    onClick={removeCoupon}
+                    className="flex shrink-0 items-center gap-1 text-emerald-700 transition-colors hover:text-emerald-900"
+                  >
+                    <X className="size-3.5" strokeWidth={2} />
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <span className="text-sm text-neutral-600">Have a coupon?</span>
+                  <div className="flex gap-2">
+                    <Input
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          applyCoupon();
+                        }
+                      }}
+                      placeholder="Enter code"
+                      className="rounded-xl uppercase"
+                      autoCapitalize="characters"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="shrink-0 rounded-xl"
+                      onClick={applyCoupon}
+                      disabled={applyingCoupon || !couponInput.trim()}
+                    >
+                      {applyingCoupon && (
+                        <Loader2 className="size-4 animate-spin" />
+                      )}
+                      Apply
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {couponError && (
+                <p className="mt-2 text-xs text-red-600">{couponError}</p>
+              )}
+            </div>
+
             <div className="mt-4 space-y-2 border-t border-neutral-200 pt-4 text-sm">
               <div className="flex items-baseline justify-between">
                 <span className="text-neutral-600">Subtotal</span>
@@ -506,6 +622,12 @@ export function CheckoutForm({
                   {formatBdt(subtotal)}
                 </span>
               </div>
+              {appliedCoupon && (
+                <div className="flex items-baseline justify-between text-emerald-700">
+                  <span>Discount ({appliedCoupon.code})</span>
+                  <span className="tabular-nums">−{formatBdt(discount)}</span>
+                </div>
+              )}
               <div className="flex items-baseline justify-between">
                 <span className="text-neutral-600">Delivery</span>
                 <span className="tabular-nums text-neutral-900">

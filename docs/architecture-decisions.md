@@ -525,3 +525,65 @@ Two simplifications after D.2 shipped, both refining ADR-016's payment surface:
    Phase E. The `Payment.paidAmount` column is LEFT in place (nullable,
    unpopulated) — dropping a column is a separate migration and it's harmless;
    only the collection/write and the read-back display were removed.
+
+---
+
+## ADR-017: Coupon rules — subtotal-only discount, server-side compute, atomic row-locked redemption, snapshot on order
+
+**Date:** 2026-07 (Phase E.5)
+
+**Decision:** A coupon system with two discount types (`PERCENTAGE`, `FIXED`),
+a minimum-subtotal gate, optional total + per-customer usage caps, and an
+optional validity window. The rules below are load-bearing and mirror the
+money-path care of the C.2 order transaction.
+
+**1. Subtotal-only discount.** A coupon discounts the order SUBTOTAL only —
+never delivery. `total = subtotal − discount + deliveryCharge`. Delivery is
+still computed from method + zone (ADR-016) untouched. Rationale: delivery is a
+real courier cost; discounting it would erode margin unpredictably, and prepaid
+already gets free delivery as its own incentive.
+
+**2. Discount capped at subtotal (never negative).** `computeDiscount` returns
+`min(raw, subtotal)`, so a large FIXED coupon can zero the subtotal but never
+make the total negative (`total ≥ deliveryCharge ≥ 0`). No max-discount cap for
+percentages in v1 (out of scope).
+
+**3. Single source of truth, server-side (ADR-005).** `src/lib/coupon.ts` is a
+pure module (`normalizeCode`, `computeDiscount`, `validateCoupon`) used by BOTH
+the display-only checkout preview (`POST /api/v1/coupons/validate`) and the
+authoritative placement redemption. The client sends only the coupon CODE — the
+server computes the subtotal (from the user's own cart) and the discount. A
+client-sent discount/subtotal/total is ignored.
+
+**4. Atomic, race-safe redemption.** Redemption happens INSIDE the existing
+order-placement transaction. The Coupon row is locked with `SELECT … FOR UPDATE`
+before the usage counts are read, so two concurrent placements of the same
+coupon serialize: the second blocks until the first commits, then re-counts and
+is correctly rejected if a cap is now reached. A cap can never be exceeded under
+concurrency. `CouponRedemption.orderId` is `@unique` (one redemption per order);
+a rolled-back attempt (orderNumber-collision retry or idempotency race) takes
+the redemption row with it, so no coupon is over-used. An idempotent replay
+returns the existing order and does NOT redeem again.
+
+**5. Snapshot on the order.** `Order.couponCode`, `Order.couponId`, and
+`Order.discountAmount` are frozen at placement. Editing, deactivating, or
+deleting the coupon later never mutates a historical order (same principle as
+ADR-004's address/product snapshots).
+
+**6. Placement re-validates and rejects (never silently drops).** If the coupon
+is invalid at placement — not found, inactive, expired, not-yet-started, below
+minimum, or a cap reached since checkout — the WHOLE placement is rejected with
+`COUPON_INVALID` (409) and the reason. The order is not silently placed without
+the discount the customer expected.
+
+**7. No refund-on-cancel (v1).** Cancelling an order does NOT release its coupon
+redemption; the redemption row stays and continues to count toward caps. Simple
+and fraud-resistant for launch.
+
+**8. Hard-delete blocked after redemption.** A coupon with any redemption can
+only be deactivated (`isActive = false`), never hard-deleted
+(`COUPON_HAS_REDEMPTIONS`) — a redemption is an immutable financial record.
+
+**Revisit if:** we need per-percentage max-discount caps, coupon refunds on
+cancellation, stacking multiple coupons, or product/category-scoped coupons —
+all deferred past v1.

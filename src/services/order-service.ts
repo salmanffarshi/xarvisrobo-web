@@ -24,13 +24,20 @@
 
 import {
   Prisma,
+  type DiscountType,
   type OrderStatus,
   type PaymentMethod,
 } from "@prisma/client";
 
 import { db } from "@/lib/db";
+import {
+  COUPON_REASON_MESSAGES,
+  normalizeCode,
+  validateCoupon,
+  type CouponFailureReason,
+} from "@/lib/coupon";
 import { computeDeliveryCharge } from "@/lib/delivery";
-import { multiplyMoney, sumMoney } from "@/lib/money";
+import { multiplyMoney, subtractMoney, sumMoney } from "@/lib/money";
 import { generateOrderNumber } from "@/lib/order-number";
 import { getSettings } from "@/services/settings-service";
 import {
@@ -84,6 +91,31 @@ export class AddressNotFoundError extends Error {
   }
 }
 
+/** Thrown when a coupon can't be redeemed at placement — not found, inactive,
+ * expired, below the minimum, or a usage cap already reached (possibly hit by a
+ * concurrent order between checkout and placement). The whole placement is
+ * rejected (the coupon is never silently dropped). Mapped to HTTP 409. */
+export class CouponInvalidError extends Error {
+  readonly code = "COUPON_INVALID";
+  constructor(readonly reason: CouponFailureReason, message: string) {
+    super(message);
+    this.name = "CouponInvalidError";
+  }
+}
+
+/** The coupon columns we lock + read for redemption (SELECT … FOR UPDATE). */
+type CouponLockRow = {
+  id: string;
+  discountType: DiscountType;
+  discountValue: Prisma.Decimal;
+  minOrderAmount: Prisma.Decimal;
+  totalUsageLimit: number | null;
+  perCustomerLimit: number | null;
+  validFrom: Date | null;
+  validUntil: Date | null;
+  isActive: boolean;
+};
+
 function isUniqueViolationOn(error: unknown, field: string): boolean {
   return (
     error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -122,6 +154,11 @@ export async function placeOrder(
     insideDhaka: settings.codInsideDhaka,
     outsideDhaka: settings.codOutsideDhaka,
   };
+
+  // Normalized once (UPPERCASE) — null means no coupon was applied.
+  const normalizedCouponCode = parsed.couponCode
+    ? normalizeCode(parsed.couponCode)
+    : null;
 
   for (let attempt = 1; attempt <= MAX_ORDER_NUMBER_ATTEMPTS; attempt++) {
     const candidateOrderNumber = generateOrderNumber();
@@ -180,14 +217,64 @@ export async function placeOrder(
           };
         });
         const subtotal = sumMoney(lines.map((line) => line.lineTotal));
+
+        // 4b. Coupon redemption (Phase E.5), race-safe. Lock the Coupon row
+        //     FOR UPDATE so concurrent placements of the same coupon serialize:
+        //     the second waits here, then counts redemptions AFTER the first
+        //     commits and is correctly rejected if a cap is now reached. The
+        //     discount is recomputed server-side from the SAME pure module the
+        //     checkout preview uses (ADR-005). Applies to the SUBTOTAL only.
+        let discountAmount = "0.00";
+        let appliedCouponId: string | null = null;
+        if (normalizedCouponCode) {
+          const rows = await tx.$queryRaw<CouponLockRow[]>`
+            SELECT "id", "discountType", "discountValue", "minOrderAmount",
+                   "totalUsageLimit", "perCustomerLimit", "validFrom",
+                   "validUntil", "isActive"
+            FROM "Coupon"
+            WHERE "code" = ${normalizedCouponCode}
+            FOR UPDATE
+          `;
+          const coupon = rows[0];
+          if (!coupon) {
+            throw new CouponInvalidError(
+              "NOT_FOUND",
+              COUPON_REASON_MESSAGES.NOT_FOUND,
+            );
+          }
+          // Counts under the lock — see the serialization note above.
+          const [totalRedemptionCount, userRedemptionCount] = await Promise.all([
+            tx.couponRedemption.count({ where: { couponId: coupon.id } }),
+            tx.couponRedemption.count({ where: { couponId: coupon.id, userId } }),
+          ]);
+          const result = validateCoupon({
+            coupon,
+            subtotal,
+            userRedemptionCount,
+            totalRedemptionCount,
+            now: new Date(),
+          });
+          if (!result.ok) {
+            throw new CouponInvalidError(result.reason, result.message);
+          }
+          discountAmount = result.discount;
+          appliedCouponId = coupon.id;
+        }
+
         // Charge from method + the customer's chosen zone (ADR-016), via the
         // same helper the checkout summary uses so display and stored agree.
+        // Delivery is NEVER discounted (ADR-017) — the coupon touches subtotal
+        // only. total = subtotal − discount + delivery, always ≥ delivery ≥ 0
+        // (discount is capped at the subtotal).
         const deliveryCharge = computeDeliveryCharge(
           parsed.paymentMethod,
           parsed.deliveryZone,
           codCharges,
         );
-        const total = sumMoney([subtotal, deliveryCharge]);
+        const total = sumMoney([
+          subtractMoney(subtotal, discountAmount),
+          deliveryCharge,
+        ]);
 
         // 5. Method-specific initial status (ADR-016): COD waits for a phone
         //    confirmation; prepaid waits for payment. Neither enters production
@@ -221,6 +308,9 @@ export async function placeOrder(
             deliveryZone: parsed.deliveryZone,
             subtotal,
             deliveryCharge,
+            couponCode: normalizedCouponCode,
+            couponId: appliedCouponId,
+            discountAmount,
             total,
             currency: "BDT",
             idempotencyKey,
@@ -253,8 +343,23 @@ export async function placeOrder(
               },
             },
           },
-          select: { orderNumber: true },
+          select: { id: true, orderNumber: true },
         });
+
+        // 10. Record the coupon redemption (Phase E.5), inside the same txn and
+        // still under the coupon-row lock. orderId is @unique → at most one
+        // redemption per order; a rolled-back attempt (orderNumber retry, or an
+        // idempotency race) takes this row with it, so no coupon is over-used.
+        if (appliedCouponId) {
+          await tx.couponRedemption.create({
+            data: {
+              couponId: appliedCouponId,
+              userId,
+              orderId: order.id,
+              discountAmount,
+            },
+          });
+        }
 
         // 11. Clear the cart — atomic with the order: a failure anywhere
         // above rolls this back and the cart survives untouched.
@@ -384,6 +489,8 @@ export async function getOrderForCustomer(
     paymentMethod: order.paymentMethod,
     deliveryZone: order.deliveryZone,
     subtotal: order.subtotal.toFixed(2),
+    couponCode: order.couponCode,
+    discountAmount: order.discountAmount.toFixed(2),
     deliveryCharge: order.deliveryCharge.toFixed(2),
     total: order.total.toFixed(2),
     currency: order.currency,
@@ -533,6 +640,8 @@ export async function adminGetOrder(
     paymentMethod: order.paymentMethod,
     deliveryZone: order.deliveryZone,
     subtotal: order.subtotal.toFixed(2),
+    couponCode: order.couponCode,
+    discountAmount: order.discountAmount.toFixed(2),
     deliveryCharge: order.deliveryCharge.toFixed(2),
     total: order.total.toFixed(2),
     currency: order.currency,

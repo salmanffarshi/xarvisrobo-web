@@ -16,3 +16,8 @@ export function sumMoney(amounts: string[]): string {
     .reduce((total, amount) => total.plus(amount), new Decimal(0))
     .toFixed(2);
 }
+
+/** "500.00" - "50.00" → "450.00". Used for the coupon discount at placement. */
+export function subtractMoney(amount: string, subtrahend: string): string {
+  return new Decimal(amount).minus(subtrahend).toFixed(2);
+}

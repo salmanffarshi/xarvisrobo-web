@@ -12,6 +12,7 @@ import { requireCustomer } from "@/lib/auth-guards";
 import { placeOrderSchema } from "@/lib/validations/order";
 import {
   AddressNotFoundError,
+  CouponInvalidError,
   EmptyCartError,
   ProductUnavailableError,
   placeOrder,
@@ -92,6 +93,18 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: { code: error.code, message: error.message } },
         { status: 400 }
+      );
+    }
+    if (error instanceof CouponInvalidError) {
+      return NextResponse.json(
+        {
+          error: {
+            code: error.code,
+            message: error.message,
+            details: { reason: error.reason },
+          },
+        },
+        { status: 409 }
       );
     }
 

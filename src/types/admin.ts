@@ -104,6 +104,9 @@ export interface AdminOrderDetail {
   paymentMethod: PaymentMethod;
   deliveryZone: DeliveryZone;
   subtotal: string;
+  /** Coupon snapshot on the order (Phase E.5); null/"0.00" when none. */
+  couponCode: string | null;
+  discountAmount: string;
   deliveryCharge: string;
   total: string;
   currency: string;

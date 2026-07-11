@@ -64,6 +64,11 @@ export type OrderDetailView = {
   /** Explicit zone chosen at checkout (ADR-016) — drives the delivery label. */
   deliveryZone: DeliveryZone;
   subtotal: string;
+  /** Coupon applied at placement (Phase E.5). Snapshotted — editing/deleting the
+   * coupon later never changes these. couponCode is null when no coupon was used
+   * and discountAmount is then "0.00". */
+  couponCode: string | null;
+  discountAmount: string;
   deliveryCharge: string;
   total: string;
   currency: string;

@@ -207,6 +207,12 @@ export default async function AdminOrderDetailPage({
 
           <dl className="mt-4 border-t pt-4">
             <Row label="Subtotal" value={formatBdt(order.subtotal)} />
+            {order.discountAmount !== "0.00" && (
+              <Row
+                label={`Discount${order.couponCode ? ` (${order.couponCode})` : ""}`}
+                value={`−${formatBdt(order.discountAmount)}`}
+              />
+            )}
             <Row
               label={`Delivery (${DELIVERY_ZONE_LABELS[order.deliveryZone]})`}
               value={formatBdt(order.deliveryCharge)}

@@ -18,6 +18,10 @@ export const placeOrderSchema = z.object({
   paymentMethod: z.enum(["BKASH", "NAGAD", "COD"]),
   // Explicit customer radio at checkout — not derived from the address (ADR-016).
   deliveryZone: z.enum(["INSIDE_DHAKA", "OUTSIDE_DHAKA"]),
+  // Optional coupon (Phase E.5). Only the CODE is sent — the server re-validates
+  // and computes the discount at placement (ADR-005). A falsy/empty value is
+  // treated as "no coupon" by the service.
+  couponCode: z.string().trim().max(40).optional(),
 });
 
 export type PlaceOrderInput = z.infer<typeof placeOrderSchema>;
