@@ -10,6 +10,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   CreditCard,
+  Factory,
   LayoutDashboard,
   ShoppingBag,
   type LucideIcon,
@@ -50,6 +51,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: CreditCard,
     isActive: (pathname, status) =>
       pathname.startsWith("/admin/orders") && status === PAYMENTS_STATUS,
+  },
+  {
+    label: "Manufacturing",
+    href: "/admin/manufacturing",
+    icon: Factory,
+    isActive: (pathname) => pathname.startsWith("/admin/manufacturing"),
   },
 ];
 
