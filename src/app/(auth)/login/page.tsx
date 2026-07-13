@@ -42,6 +42,9 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const rawCallbackUrl = searchParams.get("callbackUrl");
   const callbackUrl = safeCallbackUrl(rawCallbackUrl, "/");
+  // Set by the reset-password page after a successful reset — show a one-time
+  // "please sign in" confirmation.
+  const resetDone = searchParams.get("reset") === "success";
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -79,6 +82,13 @@ function LoginForm() {
         <CardDescription>Sign in to your Xarvisrobo account.</CardDescription>
       </CardHeader>
       <CardContent>
+        {resetDone && !serverError && (
+          <Alert className="mb-4">
+            <AlertDescription>
+              Password updated — please sign in.
+            </AlertDescription>
+          </Alert>
+        )}
         {serverError && (
           <Alert variant="destructive" className="mb-4">
             <AlertDescription>{serverError}</AlertDescription>
@@ -144,6 +154,14 @@ function LoginForm() {
                 </FormItem>
               )}
             />
+            <div className="-mt-1 text-right">
+              <Link
+                href="/forgot-password"
+                className="text-muted-foreground hover:text-foreground text-sm underline underline-offset-4"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="size-4 animate-spin" />}
               Sign in
