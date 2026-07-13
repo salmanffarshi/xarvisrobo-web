@@ -35,10 +35,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 function RegisterForm() {
   const router = useRouter();
   // Where to send the user after registering. A guest sent here from checkout
-  // carries ?callbackUrl=/checkout; anything unsafe falls back to /account
-  // (open-redirect guard — see src/lib/safe-callback-url.ts).
+  // carries ?callbackUrl=/checkout (that still wins); anything absent or unsafe
+  // falls back to Home (open-redirect guard — see src/lib/safe-callback-url.ts).
   const searchParams = useSearchParams();
-  const callbackUrl = safeCallbackUrl(searchParams.get("callbackUrl"));
+  const callbackUrl = safeCallbackUrl(searchParams.get("callbackUrl"), "/");
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -233,7 +233,7 @@ function RegisterForm() {
           <Link
             // Preserve the return destination if the guest signs in instead.
             href={
-              callbackUrl === "/account"
+              callbackUrl === "/"
                 ? "/login"
                 : `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`
             }
