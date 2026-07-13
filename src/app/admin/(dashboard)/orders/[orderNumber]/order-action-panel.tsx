@@ -116,6 +116,15 @@ const ACTION_META: Record<OrderAction, ActionMeta> = {
     body: { toStatus: "DELIVERED" },
     successMessage: "Marked as delivered.",
   },
+  MARK_RETURNED: {
+    label: "Mark returned",
+    interaction: "reason",
+    variant: "destructive",
+    path: "/return",
+    successMessage: "Order marked as returned.",
+    reasonTitle: "Mark order as returned",
+    reasonLabel: "Reason for the return",
+  },
   CANCEL: {
     label: "Cancel order",
     interaction: "reason",
