@@ -93,6 +93,13 @@ enum DiscountType {
   FIXED
 }
 
+// ProductImage now holds media of both kinds (Phase H #7); the model keeps its
+// name to avoid churn. Existing rows default to IMAGE.
+enum ProductMediaType {
+  IMAGE
+  VIDEO
+}
+
 // ============================================================================
 // USER & AUTH
 // ============================================================================
@@ -238,6 +245,9 @@ model Product {
   isFeatured       Boolean  @default(false)
   // Flexible schema for varying robot specs (voice model, screen, sensors, etc.)
   specifications   Json?
+  // Ordered array of { title, description } feature highlights (Phase H #6),
+  // same ordered-array-in-Json pattern as specifications.
+  features         Json?
   metaTitle        String?
   metaDescription  String?
   createdAt        DateTime @default(now())
@@ -254,13 +264,14 @@ model Product {
 }
 
 model ProductImage {
-  id        String   @id @default(cuid())
+  id        String           @id @default(cuid())
   productId String
   url       String
   altText   String?
-  sortOrder Int      @default(0)
-  isPrimary Boolean  @default(false)
-  createdAt DateTime @default(now())
+  sortOrder Int              @default(0)
+  isPrimary Boolean          @default(false)
+  type      ProductMediaType @default(IMAGE)
+  createdAt DateTime         @default(now())
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
