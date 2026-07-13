@@ -80,7 +80,30 @@ export const adminLoginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
+/** Forgot-password request: just the email to send a reset link to. */
+export const forgotPasswordSchema = z.object({
+  email: emailSchema,
+});
+
+/**
+ * Reset-password submission. `newPassword` must satisfy the full password
+ * policy; `confirmPassword` must match it. The token is opaque here — the
+ * service validates it against the DB.
+ */
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().min(1, "Missing reset token"),
+    newPassword: passwordSchema,
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
+
 // Inferred TypeScript types — import these instead of hand-writing shapes.
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type CustomerLoginInput = z.infer<typeof customerLoginSchema>;
 export type AdminLoginInput = z.infer<typeof adminLoginSchema>;
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
