@@ -26,6 +26,7 @@ export type ProgressStep = {
 
 export type OrderProgress = {
   cancelled: boolean;
+  returned: boolean;
   steps: ProgressStep[];
 };
 
@@ -75,6 +76,7 @@ function prepaidCurrentIndex(status: OrderStatus): number {
     // list them so the enum is covered exhaustively.
     case "WAITING_FOR_ORDER_CONFIRMATION":
     case "ORDER_CONFIRMED":
+    case "RETURNED":
     case "CANCELLED":
       return 0;
     default:
@@ -98,6 +100,7 @@ function codCurrentIndex(status: OrderStatus): number {
     case "WAITING_FOR_PAYMENT":
     case "WAITING_FOR_PAYMENT_VERIFICATION":
     case "PAYMENT_VERIFIED":
+    case "RETURNED":
     case "CANCELLED":
       return 0;
     default:
@@ -123,16 +126,20 @@ function buildSteps(
 }
 
 /**
- * Build the stepper model for an order. When `cancelled` is true the UI
- * renders a distinct treatment instead of the normal stepper, so `steps` is
- * left empty (we don't store the pre-cancel status to reconstruct a path).
+ * Build the stepper model for an order. When `cancelled` or `returned` is true
+ * the UI renders a distinct muted treatment instead of the normal stepper, so
+ * `steps` is left empty (we don't store the pre-terminal status to reconstruct
+ * a path). RETURNED mirrors the CANCELLED off-path treatment (Phase F).
  */
 export function getOrderProgress(
   paymentMethod: PaymentMethod,
   status: OrderStatus,
 ): OrderProgress {
   if (status === "CANCELLED") {
-    return { cancelled: true, steps: [] };
+    return { cancelled: true, returned: false, steps: [] };
+  }
+  if (status === "RETURNED") {
+    return { cancelled: false, returned: true, steps: [] };
   }
 
   const isCod = paymentMethod === "COD";
@@ -141,5 +148,5 @@ export function getOrderProgress(
     ? codCurrentIndex(status)
     : prepaidCurrentIndex(status);
 
-  return { cancelled: false, steps: buildSteps(labels, currentIndex) };
+  return { cancelled: false, returned: false, steps: buildSteps(labels, currentIndex) };
 }

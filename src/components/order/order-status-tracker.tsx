@@ -60,9 +60,9 @@ export function OrderStatusTracker({
   paymentMethod: PaymentMethod;
   status: OrderStatus;
 }) {
-  const { cancelled, steps } = getOrderProgress(paymentMethod, status);
+  const { cancelled, returned, steps } = getOrderProgress(paymentMethod, status);
 
-  if (cancelled) {
+  if (cancelled || returned) {
     return (
       <div className="flex items-start gap-3 rounded-2xl border border-neutral-200 bg-neutral-50 p-5">
         <Ban
@@ -72,7 +72,7 @@ export function OrderStatusTracker({
         />
         <div>
           <p className="font-medium text-neutral-700">
-            This order was cancelled.
+            {returned ? "This order was returned." : "This order was cancelled."}
           </p>
           <p className="mt-1 text-sm text-neutral-500">
             If you have any questions, please get in touch with us.

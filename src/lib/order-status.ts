@@ -21,6 +21,7 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   IN_PRODUCTION: "Preparing",
   SHIPPED: "Shipped",
   DELIVERED: "Delivered",
+  RETURNED: "Returned",
   CANCELLED: "Cancelled",
 };
 
@@ -40,6 +41,7 @@ export const ADMIN_ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   IN_PRODUCTION: "In Production",
   SHIPPED: "Shipped",
   DELIVERED: "Delivered",
+  RETURNED: "Returned",
   CANCELLED: "Cancelled",
 };
 
@@ -75,6 +77,7 @@ export function statusTone(status: OrderStatus): StatusTone {
       return "progress";
     case "DELIVERED":
       return "success";
+    case "RETURNED":
     case "CANCELLED":
       return "terminal";
   }
