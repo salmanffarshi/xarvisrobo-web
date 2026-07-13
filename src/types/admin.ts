@@ -40,9 +40,11 @@ export interface AdminDashboardStats {
   totals: {
     totalOrders: number; // all orders excluding CANCELLED
     deliveredOrders: number; // DELIVERED
+    returnedOrders: number; // RETURNED (Phase F)
     cancelledOrders: number; // CANCELLED
     totalCustomers: number; // users with role CUSTOMER
-    revenue: string; // decimal string; sum of DELIVERED order totals
+    revenue: string; // decimal string; recognized revenue (payment VERIFIED, not returned/cancelled)
+    returnedValue: string; // decimal string; revenue reversed by returns (sum of RETURNED totals) (Phase F)
   };
   recentOrders: AdminRecentOrder[];
 }

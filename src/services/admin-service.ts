@@ -4,6 +4,7 @@
 // tooling / mobile ops app reuse the same function.
 
 import { db } from "@/lib/db";
+import { REVENUE_ORDER_WHERE } from "@/lib/revenue";
 import type { AdminDashboardStats } from "@/types/admin";
 
 /**
@@ -13,21 +14,28 @@ import type { AdminDashboardStats } from "@/types/admin";
  * orders is one bounded query. Nothing loads full order rows for the counts.
  */
 export async function getDashboardStats(): Promise<AdminDashboardStats> {
-  const [statusGroups, totalCustomers, revenueAgg, recent] = await Promise.all([
-    db.order.groupBy({
-      by: ["status"],
-      _count: { _all: true },
-    }),
-    db.user.count({ where: { role: "CUSTOMER" } }),
-    // Revenue counts DELIVERED orders only — the conservative figure (money we
-    // have actually earned and shipped). We can widen this later (e.g. include
-    // SHIPPED, or paid-but-in-production) once the operator decides what
-    // "revenue" should mean for the business.
-    db.order.aggregate({
-      _sum: { total: true },
-      where: { status: "DELIVERED" },
-    }),
-    db.order.findMany({
+  const [statusGroups, totalCustomers, revenueAgg, returnedAgg, recent] =
+    await Promise.all([
+      db.order.groupBy({
+        by: ["status"],
+        _count: { _all: true },
+      }),
+      db.user.count({ where: { role: "CUSTOMER" } }),
+      // Recognized revenue: sum of order totals matching the DERIVED predicate —
+      // Payment VERIFIED and status not RETURNED/CANCELLED (Phase F). This is the
+      // money we've actually received and not reversed; it's always consistent
+      // with current state because it's derived, never a stored flag.
+      db.order.aggregate({
+        _sum: { total: true },
+        where: REVENUE_ORDER_WHERE,
+      }),
+      // Reversed revenue: sum of totals over RETURNED orders — what returns took
+      // back out of recognized revenue.
+      db.order.aggregate({
+        _sum: { total: true },
+        where: { status: "RETURNED" },
+      }),
+      db.order.findMany({
       orderBy: { createdAt: "desc" },
       take: 10,
       select: {
@@ -68,9 +76,11 @@ export async function getDashboardStats(): Promise<AdminDashboardStats> {
     totals: {
       totalOrders: totalOrdersExclCancelled,
       deliveredOrders: count("DELIVERED"),
+      returnedOrders: count("RETURNED"),
       cancelledOrders: count("CANCELLED"),
       totalCustomers,
       revenue: (revenueAgg._sum.total ?? 0).toFixed(2),
+      returnedValue: (returnedAgg._sum.total ?? 0).toFixed(2),
     },
     recentOrders: recent.map((order) => ({
       orderNumber: order.orderNumber,
