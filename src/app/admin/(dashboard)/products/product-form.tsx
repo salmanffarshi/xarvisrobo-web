@@ -73,12 +73,14 @@ export function ProductForm({
       isActive: true,
       isFeatured: false,
       specifications: [],
+      features: [],
       metaTitle: "",
       metaDescription: "",
     },
   });
 
   const specs = useFieldArray({ control: form.control, name: "specifications" });
+  const features = useFieldArray({ control: form.control, name: "features" });
 
   async function onSubmit(values: CreateProductInput) {
     setIsSaving(true);
@@ -312,6 +314,75 @@ export function ProductForm({
             >
               <Plus className="mr-2 size-4" />
               Add spec
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Features</CardTitle>
+            <CardDescription>
+              Highlights shown on the product page between the description and
+              specifications, in the order entered. Description is optional.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {features.fields.length === 0 && (
+              <p className="text-muted-foreground text-sm">No features yet.</p>
+            )}
+            {features.fields.map((f, i) => (
+              <div key={f.id} className="flex items-start gap-2">
+                <div className="grid flex-1 gap-2">
+                  <Input
+                    placeholder="Title (e.g. All-day battery)"
+                    {...form.register(`features.${i}.title`)}
+                  />
+                  <Input
+                    placeholder="Description (optional)"
+                    {...form.register(`features.${i}.description`)}
+                  />
+                </div>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    disabled={i === 0}
+                    onClick={() => features.move(i, i - 1)}
+                    aria-label="Move feature up"
+                  >
+                    <ArrowUp className="size-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    disabled={i === features.fields.length - 1}
+                    onClick={() => features.move(i, i + 1)}
+                    aria-label="Move feature down"
+                  >
+                    <ArrowDown className="size-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => features.remove(i)}
+                    aria-label="Remove feature"
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => features.append({ title: "", description: "" })}
+            >
+              <Plus className="mr-2 size-4" />
+              Add feature
             </Button>
           </CardContent>
         </Card>

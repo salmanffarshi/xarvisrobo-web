@@ -52,6 +52,7 @@ export default async function EditProductPage({
             isActive: product.isActive,
             isFeatured: product.isFeatured,
             specifications: product.specifications,
+            features: product.features,
             metaTitle: product.metaTitle ?? "",
             metaDescription: product.metaDescription ?? "",
           },

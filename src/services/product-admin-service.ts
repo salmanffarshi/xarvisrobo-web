@@ -9,6 +9,7 @@
 import { Prisma } from "@prisma/client";
 
 import { db } from "@/lib/db";
+import { normalizeFeatures, type ProductFeature } from "@/lib/product-features";
 import { normalizeSpecs, type ProductSpec } from "@/lib/product-specs";
 import { uniqueSlug } from "@/lib/slug";
 import {
@@ -56,6 +57,7 @@ export type AdminProductDetail = {
   isActive: boolean;
   isFeatured: boolean;
   specifications: ProductSpec[];
+  features: ProductFeature[];
   metaTitle: string | null;
   metaDescription: string | null;
   images: AdminProductImage[];
@@ -200,6 +202,7 @@ export async function get(id: string): Promise<AdminProductDetail | null> {
     isActive: row.isActive,
     isFeatured: row.isFeatured,
     specifications: normalizeSpecs(row.specifications),
+    features: normalizeFeatures(row.features),
     metaTitle: row.metaTitle,
     metaDescription: row.metaDescription,
     images: row.images.map((img) => ({
@@ -245,6 +248,7 @@ export async function create(input: CreateProductInput): Promise<{ id: string }>
         isActive: data.isActive ?? true,
         isFeatured: data.isFeatured ?? false,
         specifications: data.specifications ?? [],
+        features: data.features ?? [],
         metaTitle: data.metaTitle ?? null,
         metaDescription: data.metaDescription ?? null,
       },
@@ -309,6 +313,7 @@ export async function update(
       ...(data.specifications !== undefined
         ? { specifications: data.specifications }
         : {}),
+      ...(data.features !== undefined ? { features: data.features } : {}),
       ...(data.metaTitle !== undefined ? { metaTitle: data.metaTitle || null } : {}),
       ...(data.metaDescription !== undefined
         ? { metaDescription: data.metaDescription || null }

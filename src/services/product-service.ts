@@ -59,6 +59,7 @@ export type ProductDetail = {
   stockQuantity: number;
   isFeatured: boolean;
   specifications: Prisma.JsonValue;
+  features: Prisma.JsonValue;
   metaTitle: string | null;
   metaDescription: string | null;
   createdAt: Date;
@@ -200,6 +201,7 @@ export async function getBySlug(slug: string): Promise<ProductDetail | null> {
     stockQuantity: row.stockQuantity,
     isFeatured: row.isFeatured,
     specifications: row.specifications ?? null,
+    features: row.features ?? null,
     metaTitle: row.metaTitle,
     metaDescription: row.metaDescription,
     createdAt: row.createdAt,

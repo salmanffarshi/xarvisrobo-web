@@ -6,6 +6,7 @@ import { AddToCartButton } from "@/components/product/add-to-cart-button";
 import { RobotPlaceholder } from "@/components/product/robot-placeholder";
 import { Badge } from "@/components/ui/badge";
 import { formatBdt } from "@/lib/format";
+import { normalizeFeatures } from "@/lib/product-features";
 import { normalizeSpecs } from "@/lib/product-specs";
 import * as productService from "@/services/product-service";
 
@@ -38,6 +39,8 @@ export default async function ProductDetailPage({ params }: Props) {
   const isPriceTbd = Number(product.basePrice) === 0;
   // Ordered { label, value }[] — array order is preserved by jsonb (fixes B.2).
   const specs = normalizeSpecs(product.specifications);
+  // Ordered { title, description }[] feature highlights (Phase H #6).
+  const features = normalizeFeatures(product.features);
   // Gallery: primary first, then the rest by sort order (already sorted by the
   // service). Empty → the SVG placeholder hero.
   const [hero, ...moreImages] = [...product.images].sort(
@@ -134,6 +137,28 @@ export default async function ProductDetailPage({ params }: Props) {
             <p key={i}>{paragraph}</p>
           ))}
         </div>
+
+        {features.length > 0 && (
+          <section className="mt-16">
+            <h2 className="text-2xl font-semibold tracking-tight text-neutral-900">
+              Features
+            </h2>
+            <div className="mt-6 grid grid-cols-1 gap-x-10 gap-y-6 sm:grid-cols-2">
+              {features.map((feature, i) => (
+                <div key={`${feature.title}-${i}`}>
+                  <h3 className="text-base font-medium text-neutral-900">
+                    {feature.title}
+                  </h3>
+                  {feature.description && (
+                    <p className="mt-1 text-sm leading-relaxed text-neutral-600">
+                      {feature.description}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {specs.length > 0 && (
           <section className="mt-16">

@@ -17,6 +17,13 @@ const specSchema = z.object({
   value: z.string().trim().min(1, "Value required").max(300),
 });
 
+/** One ordered feature highlight (Phase H #6). Title required; description
+ * optional (may be empty). Order = array order. */
+const featureSchema = z.object({
+  title: z.string().trim().min(1, "Title required").max(80),
+  description: z.string().trim().max(300),
+});
+
 export const createProductSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters").max(120),
   sku: z.string().trim().min(2, "SKU must be at least 2 characters").max(40),
@@ -28,6 +35,7 @@ export const createProductSchema = z.object({
   isActive: z.boolean().optional(),
   isFeatured: z.boolean().optional(),
   specifications: z.array(specSchema).optional(),
+  features: z.array(featureSchema).max(12, "Up to 12 features").optional(),
   metaTitle: z.string().trim().max(120).optional(),
   metaDescription: z.string().trim().max(300).optional(),
 });
