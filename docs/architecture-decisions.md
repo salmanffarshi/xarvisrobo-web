@@ -587,3 +587,62 @@ only be deactivated (`isActive = false`), never hard-deleted
 **Revisit if:** we need per-percentage max-discount caps, coupon refunds on
 cancellation, stacking multiple coupons, or product/category-scoped coupons —
 all deferred past v1.
+
+---
+
+## ADR-018: Revenue is derived (predicate), not stored — COD paid at delivery, returns reverse via status
+
+**Date:** 2026-07 (Phase F)
+
+**Decision:** Recognized revenue is DERIVED from current state, never a stored
+flag or a separate revenue table. The single rule, expressed once as a Prisma
+where-clause in `src/lib/revenue.ts` (`REVENUE_ORDER_WHERE`) and reused by every
+revenue query:
+
+  An order contributes to revenue IFF
+    Payment.status === VERIFIED  AND  Order.status ∉ { RETURNED, CANCELLED }.
+
+**Consequences (all fall out of the one predicate):**
+
+- **Prepaid** counts from PAYMENT_VERIFIED onward — its Payment goes VERIFIED at
+  the E.2.2 verification gate.
+- **COD** counts at delivery. Payment is PENDING until then; marking a COD order
+  DELIVERED flips its Payment → VERIFIED (verifiedById/verifiedAt = admin/now) in
+  the SAME `advanceStatus` transaction (Phase F item #1). This is the whole
+  mechanism — there is no separate revenue write; the predicate simply now sees a
+  VERIFIED payment on a DELIVERED, non-returned order. Prepaid delivery leaves the
+  already-VERIFIED payment untouched.
+- **RETURNED** (Phase F item #2) is excluded by status, so revenue reverses
+  AUTOMATICALLY and identically for prepaid (counted since verification) and COD
+  (counted since delivery). `markReturned` is transactional, guarded to SHIPPED
+  (refused on delivery) or DELIVERED (post-delivery) via the shared
+  `legalNextActions`, and stores `returnedAt` + `returnReason`.
+- **CANCELLED** was already excluded.
+
+**What we deliberately do NOT do (v1):**
+
+- **No refund payment-status.** A returned order keeps its Payment as-is (a
+  VERIFIED payment stays VERIFIED); RETURNED status alone removes it from revenue.
+  A `REFUNDED` PaymentStatus can be added later without touching the predicate.
+- **No Manufacturing change on return.** The unit was built (build-to-order); there
+  is no inventory restore in v1. Keeping it consistent means leaving it untouched.
+- **No stored revenue.** The dashboard sums orders matching the predicate on every
+  read, so the figure is always consistent with current state — no double-counting,
+  no reconciliation. `Order` gains only `returnedAt` / `returnReason` (record-keeping,
+  not revenue state).
+
+**Why derived over stored:** a stored revenue flag or ledger would have to be kept
+in sync on every status/payment transition (deliver, return, cancel, re-verify),
+which is exactly where drift and double-counting bugs live. Deriving from the two
+facts that actually define revenue (payment received; order not returned/cancelled)
+makes every transition automatically correct and keeps the rule in one auditable
+place.
+
+**Dashboard:** `revenue` is now Σ`total` over the predicate ("Recognized revenue",
+replacing the old DELIVERED-only sum); `returnedOrders` (count) and `returnedValue`
+(Σ`total` over RETURNED = reversed revenue) are surfaced beside it.
+
+**Revisit if:** we add a `REFUNDED` payment status / actual refund flow, want
+inventory restore on return, need revenue recognised at a different point (e.g.
+shipment), or the derived query becomes a performance concern at scale (would add a
+maintained aggregate, not change the rule).
