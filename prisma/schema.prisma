@@ -60,6 +60,7 @@ enum OrderStatus {
   IN_PRODUCTION // admin started production (Phase E)
   SHIPPED // handed to courier
   DELIVERED // customer received
+  RETURNED // returned after ship/deliver; reverses revenue, record kept (Phase F)
   CANCELLED // terminal, reason stored
 }
 
@@ -327,6 +328,8 @@ model Order {
 
   cancelledAt  DateTime?
   cancelReason String?
+  returnedAt   DateTime? // set when marked RETURNED (Phase F)
+  returnReason String? // why the order was returned (Phase F)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
