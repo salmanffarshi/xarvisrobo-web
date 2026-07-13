@@ -124,14 +124,18 @@ export default async function AdminDashboardPage() {
         </div>
       </section>
 
-      {/* Totals — the at-a-glance business figures. */}
+      {/* Totals — the at-a-glance business figures. Recognized revenue is the
+          DERIVED figure (payment received, not returned/cancelled); returns are
+          surfaced beside it as their own count + reversed value (Phase F). */}
       <section className="mt-8">
         <h2 className="text-sm font-semibold tracking-tight">Totals</h2>
-        <div className="mt-3 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="mt-3 grid grid-cols-2 gap-4 lg:grid-cols-3">
           <StatCard label="Total orders" value={totals.totalOrders} />
           <StatCard label="Delivered" value={totals.deliveredOrders} />
+          <StatCard label="Returned orders" value={totals.returnedOrders} />
           <StatCard label="Customers" value={totals.totalCustomers} />
-          <StatCard label="Revenue (delivered)" value={formatBdt(totals.revenue)} />
+          <StatCard label="Recognized revenue" value={formatBdt(totals.revenue)} />
+          <StatCard label="Returned value" value={formatBdt(totals.returnedValue)} />
         </div>
       </section>
 
