@@ -148,7 +148,7 @@ Update this list as each phase completes. Also append a one-line note to `docs/p
 - [x] Phase E.5 — 2026-07-11 — coupon system (%/fixed, min order, total + per-customer caps, expiry); server-side discount; atomic snapshot-on-order redemption; Phase E complete
 - [x] Phase E — admin dashboard (products, payments, orders, customers, manufacturing, coupons) — complete
 - [x] Phase F — 2026-07-13 — revenue & returns: derived revenue predicate, COD-delivered-marks-paid, RETURNED status + reversal, dashboard return metrics
-- [ ] Phase G — pre-launch (security review, deploy)
+- [x] Phase G — 2026-07-13 — login lands on Home (callbackUrl preserved); forgot-password (Resend email, hashed single-use 24h tokens)
 
 ## Reference documents
 
