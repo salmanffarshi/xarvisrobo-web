@@ -20,6 +20,7 @@ export type OrderAction =
   | "START_PRODUCTION"
   | "MARK_SHIPPED"
   | "MARK_DELIVERED"
+  | "MARK_RETURNED"
   | "CANCEL";
 
 /**
@@ -47,6 +48,17 @@ export const CANCELLABLE_STATUSES: ReadonlySet<OrderStatus> = new Set<OrderStatu
   "WAITING_FOR_ORDER_CONFIRMATION",
   "ORDER_CONFIRMED",
   "IN_PRODUCTION",
+]);
+
+/**
+ * States an order can be marked RETURNED from (Phase F). SHIPPED covers a
+ * refused-on-delivery return; DELIVERED covers a post-delivery return. Marking
+ * returned reverses revenue via the predicate while keeping the order record.
+ * DELIVERED is therefore no longer fully terminal.
+ */
+export const RETURNABLE_STATUSES: ReadonlySet<OrderStatus> = new Set<OrderStatus>([
+  "SHIPPED",
+  "DELIVERED",
 ]);
 
 /** Prepaid methods (bKash / Nagad). COD is the only non-prepaid method. */
@@ -100,6 +112,11 @@ export function legalNextActions({
   // Cancel, from any non-terminal pre-SHIPPED state.
   if (CANCELLABLE_STATUSES.has(status)) {
     actions.push("CANCEL");
+  }
+
+  // Return, from SHIPPED (refused) or DELIVERED (post-delivery).
+  if (RETURNABLE_STATUSES.has(status)) {
+    actions.push("MARK_RETURNED");
   }
 
   return actions;

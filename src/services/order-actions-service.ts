@@ -398,3 +398,62 @@ export async function cancelOrder(
     return { orderNumber, status: "CANCELLED" };
   });
 }
+
+/**
+ * Mark an order RETURNED (Phase F). Allowed from SHIPPED (refused on delivery)
+ * or DELIVERED (post-delivery return) — enforced via the shared legalNextActions
+ * rule; any other state throws InvalidStateError. Stores returnedAt +
+ * returnReason.
+ *
+ * Revenue reversal is AUTOMATIC: RETURNED is excluded by REVENUE_ORDER_WHERE, so
+ * the order drops out of recognized revenue with no manual adjustment. This works
+ * identically for prepaid (counted since verification) and COD (counted since
+ * delivery). Payment is LEFT as-is (a VERIFIED payment stays VERIFIED — no refund
+ * status in v1) and Manufacturing is untouched (the unit was built; no inventory
+ * restore in build-to-order v1).
+ */
+export async function markReturned(
+  adminId: string,
+  orderNumber: string,
+  reason: string,
+): Promise<OrderActionResult> {
+  const trimmed = reason.trim();
+  if (!trimmed) {
+    throw new ReasonRequiredError();
+  }
+
+  return db.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({
+      where: { orderNumber },
+      select: { id: true, status: true, paymentMethod: true },
+    });
+    if (!order) {
+      throw new OrderNotFoundError();
+    }
+
+    if (!legalNextActions(order).includes("MARK_RETURNED")) {
+      throw new InvalidStateError("This order can no longer be returned");
+    }
+
+    await tx.order.update({
+      where: { id: order.id },
+      data: {
+        status: "RETURNED",
+        returnedAt: new Date(),
+        returnReason: trimmed,
+      },
+    });
+
+    await tx.orderStatusHistory.create({
+      data: {
+        orderId: order.id,
+        fromStatus: order.status,
+        toStatus: "RETURNED",
+        changedById: adminId,
+        note: `Returned: ${trimmed}`,
+      },
+    });
+
+    return { orderNumber, status: "RETURNED" };
+  });
+}
