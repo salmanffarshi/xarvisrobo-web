@@ -269,6 +269,7 @@ const ADVANCE_NOTES: Record<OrderStatus, string> = {
   PAYMENT_VERIFIED: "",
   WAITING_FOR_ORDER_CONFIRMATION: "",
   ORDER_CONFIRMED: "",
+  RETURNED: "",
   CANCELLED: "",
 };
 
@@ -277,6 +278,13 @@ const ADVANCE_NOTES: Record<OrderStatus, string> = {
  * PAYMENT_VERIFIED/ORDER_CONFIRMED → IN_PRODUCTION, IN_PRODUCTION → SHIPPED,
  * SHIPPED → DELIVERED. Any other (from, to) pair is rejected. Does NOT touch
  * Manufacturing — the row already exists from the gate; internal stages are E.3.
+ *
+ * COD DELIVERY COMPLETION (Phase F): when the SHIPPED → DELIVERED step runs on a
+ * COD order whose Payment is still PENDING, the payment is flipped to VERIFIED
+ * (cash collected on delivery) in the SAME transaction. That single flip is what
+ * makes a COD order count as recognized revenue exactly at delivery — via the
+ * REVENUE_ORDER_WHERE predicate, no separate revenue write. Prepaid is already
+ * VERIFIED (it passed the verification gate) so its payment is left untouched.
  */
 export async function advanceStatus(
   adminId: string,
@@ -286,7 +294,12 @@ export async function advanceStatus(
   return db.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { orderNumber },
-      select: { id: true, status: true },
+      select: {
+        id: true,
+        status: true,
+        paymentMethod: true,
+        payment: { select: { id: true, status: true } },
+      },
     });
     if (!order) {
       throw new OrderNotFoundError();
@@ -303,13 +316,30 @@ export async function advanceStatus(
       data: { status: toStatus },
     });
 
+    // COD cash-on-delivery: record payment as received when the order is
+    // delivered. Prepaid payments are already VERIFIED, so the PENDING check
+    // leaves them alone.
+    const codPaymentRecorded =
+      toStatus === "DELIVERED" &&
+      order.paymentMethod === "COD" &&
+      order.payment?.status === "PENDING";
+
+    if (codPaymentRecorded) {
+      await tx.payment.update({
+        where: { id: order.payment!.id },
+        data: { status: "VERIFIED", verifiedById: adminId, verifiedAt: new Date() },
+      });
+    }
+
     await tx.orderStatusHistory.create({
       data: {
         orderId: order.id,
         fromStatus: order.status,
         toStatus,
         changedById: adminId,
-        note: ADVANCE_NOTES[toStatus],
+        note: codPaymentRecorded
+          ? "Marked delivered; COD payment recorded on delivery"
+          : ADVANCE_NOTES[toStatus],
       },
     });
 
