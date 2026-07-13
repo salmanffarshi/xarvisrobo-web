@@ -60,7 +60,7 @@ export default async function EditProductPage({
       />
 
       <section className="mt-8">
-        <h2 className="mb-4 text-lg font-semibold tracking-tight">Images</h2>
+        <h2 className="mb-4 text-lg font-semibold tracking-tight">Media</h2>
         <ImageManager productId={product.id} images={product.images} />
       </section>
 

@@ -42,6 +42,7 @@ export type AdminProductImage = {
   altText: string | null;
   sortOrder: number;
   isPrimary: boolean;
+  type: "IMAGE" | "VIDEO";
 };
 
 export type AdminProductDetail = {
@@ -88,6 +89,16 @@ export class ProductNotFoundError extends Error {
   constructor() {
     super("Product not found");
     this.name = "ProductNotFoundError";
+  }
+}
+
+/** Thrown when trying to set a video as the primary media. Mapped to 400.
+ * Primary must be an image — the detail page leads with an image (Phase H #7). */
+export class PrimaryMustBeImageError extends Error {
+  readonly code = "PRIMARY_MUST_BE_IMAGE";
+  constructor() {
+    super("Only an image can be the primary media. Videos are gallery items.");
+    this.name = "PrimaryMustBeImageError";
   }
 }
 
@@ -149,6 +160,7 @@ export async function list(
         isFeatured: true,
         category: { select: { name: true } },
         images: {
+          where: { type: "IMAGE" },
           orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }],
           take: 1,
           select: { url: true },
@@ -211,6 +223,7 @@ export async function get(id: string): Promise<AdminProductDetail | null> {
       altText: img.altText,
       sortOrder: img.sortOrder,
       isPrimary: img.isPrimary,
+      type: img.type,
     })),
   };
 }
@@ -353,7 +366,9 @@ async function requireProduct(id: string): Promise<void> {
   if (!p) throw new ProductNotFoundError();
 }
 
-/** Append an image. The first image on a product becomes its primary. */
+/** Append a media item (image or video). Videos are never primary; an image
+ * becomes primary only when the product has no primary image yet — so the
+ * primary/lead media is always an image (Phase H #7). */
 export async function addImage(
   productId: string,
   input: AddImageInput,
@@ -362,13 +377,16 @@ export async function addImage(
   await requireProduct(productId);
 
   const count = await db.productImage.count({ where: { productId } });
+  const hasPrimary =
+    (await db.productImage.count({ where: { productId, isPrimary: true } })) > 0;
   const created = await db.productImage.create({
     data: {
       productId,
       url: data.url,
       altText: data.altText ?? null,
       sortOrder: count,
-      isPrimary: count === 0,
+      type: data.type,
+      isPrimary: data.type === "IMAGE" && !hasPrimary,
     },
     select: { id: true },
   });
@@ -385,9 +403,14 @@ export async function updateImage(
   const data = updateImageSchema.parse(input);
   const image = await db.productImage.findFirst({
     where: { id: imageId, productId },
-    select: { id: true },
+    select: { id: true, type: true },
   });
   if (!image) throw new ProductNotFoundError();
+
+  // A video can never be the primary/lead media (Phase H #7).
+  if (data.isPrimary === true && image.type === "VIDEO") {
+    throw new PrimaryMustBeImageError();
+  }
 
   await db.$transaction(async (tx) => {
     if (data.isPrimary === true) {
@@ -421,8 +444,9 @@ export async function removeImage(
   await db.$transaction(async (tx) => {
     await tx.productImage.delete({ where: { id: imageId } });
     if (image.isPrimary) {
+      // Promote the lowest-sorted IMAGE (never a video) to primary.
       const next = await tx.productImage.findFirst({
-        where: { productId },
+        where: { productId, type: "IMAGE" },
         orderBy: { sortOrder: "asc" },
         select: { id: true },
       });

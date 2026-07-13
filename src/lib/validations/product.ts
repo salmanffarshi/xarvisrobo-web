@@ -43,10 +43,12 @@ export const createProductSchema = z.object({
 // All fields optional on update; the service only touches what is provided.
 export const updateProductSchema = createProductSchema.partial();
 
-/** Add-image payload. */
+/** Add-media payload. `type` distinguishes an image from a video (Phase H #7);
+ * it defaults to IMAGE for backward compatibility. */
 export const addImageSchema = z.object({
   url: z.string().url(),
   altText: z.string().trim().max(200).optional(),
+  type: z.enum(["IMAGE", "VIDEO"]).default("IMAGE"),
 });
 
 /** Image update: set primary and/or a new sort order. */

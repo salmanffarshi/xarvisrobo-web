@@ -8,11 +8,12 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp, Loader2, Star, Trash2, Upload } from "lucide-react";
+import { ArrowDown, ArrowUp, Loader2, Play, Star, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { uploadProductImage } from "@/lib/upload-client";
+import { galleryThumbUrl, videoPosterUrl } from "@/lib/cloudinary-url";
+import { uploadProductMedia } from "@/lib/upload-client";
 import type { AdminProductImage } from "@/services/product-admin-service";
 
 export function ImageManager({
@@ -47,9 +48,9 @@ export function ImageManager({
     if (!file) return;
     setBusy(true);
     try {
-      const { url } = await uploadProductImage(file);
-      await call("POST", base, { url });
-      toast.success("Image added.");
+      const { url, type } = await uploadProductMedia(file);
+      await call("POST", base, { url, type });
+      toast.success(type === "VIDEO" ? "Video added." : "Image added.");
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Upload failed.");
@@ -96,7 +97,7 @@ export function ImageManager({
         <input
           ref={fileRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"
           className="hidden"
           onChange={onFile}
         />
@@ -111,15 +112,17 @@ export function ImageManager({
           ) : (
             <Upload className="mr-2 size-4" />
           )}
-          Upload image
+          Upload media
         </Button>
-        <span className="text-muted-foreground text-xs">JPG, PNG, or WebP · up to 5MB</span>
+        <span className="text-muted-foreground text-xs">
+          Image (JPG, PNG, WebP · up to 5MB) or video (MP4, WebM, MOV · up to 50MB)
+        </span>
       </div>
 
       {images.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          No images yet. Uploaded images appear on the customer catalog; the
-          primary one is the thumbnail.
+          No media yet. Uploaded media appears on the customer catalog; the
+          primary image leads the gallery. Videos are additional gallery items.
         </p>
       ) : (
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -127,10 +130,30 @@ export function ImageManager({
             <li key={img.id} className="overflow-hidden rounded-xl border">
               <div className="bg-muted relative aspect-square">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={img.url} alt={img.altText ?? ""} className="size-full object-cover" />
+                <img
+                  src={
+                    img.type === "VIDEO"
+                      ? videoPosterUrl(img.url)
+                      : galleryThumbUrl(img.url)
+                  }
+                  alt={img.altText ?? ""}
+                  className="size-full object-cover"
+                />
+                {img.type === "VIDEO" && (
+                  <span className="absolute inset-0 flex items-center justify-center">
+                    <span className="flex size-9 items-center justify-center rounded-full bg-black/60">
+                      <Play className="size-4 fill-white text-white" />
+                    </span>
+                  </span>
+                )}
                 {img.isPrimary && (
                   <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-xs text-white">
                     Primary
+                  </span>
+                )}
+                {img.type === "VIDEO" && (
+                  <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-xs text-white">
+                    Video
                   </span>
                 )}
               </div>
@@ -158,16 +181,18 @@ export function ImageManager({
                   </Button>
                 </div>
                 <div className="flex gap-1">
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    disabled={busy || img.isPrimary}
-                    onClick={() => setPrimary(img.id)}
-                    aria-label="Set as primary"
-                  >
-                    <Star className={img.isPrimary ? "size-4 fill-current" : "size-4"} />
-                  </Button>
+                  {img.type === "IMAGE" && (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      disabled={busy || img.isPrimary}
+                      onClick={() => setPrimary(img.id)}
+                      aria-label="Set as primary"
+                    >
+                      <Star className={img.isPrimary ? "size-4 fill-current" : "size-4"} />
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     size="icon"

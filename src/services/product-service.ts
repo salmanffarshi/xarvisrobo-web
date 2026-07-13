@@ -71,6 +71,7 @@ export type ProductDetail = {
     altText: string | null;
     sortOrder: number;
     isPrimary: boolean;
+    type: "IMAGE" | "VIDEO";
   }[];
 };
 
@@ -88,8 +89,10 @@ const cardSelect = {
   stockQuantity: true,
   updatedAt: true,
   category: { select: { name: true } },
-  // Primary image (else lowest-sorted) for the card thumbnail.
+  // Primary image (else lowest-sorted image) for the card thumbnail — always an
+  // image, never a video (the card renders an <img>).
   images: {
+    where: { type: "IMAGE" },
     orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }],
     take: 1,
     select: { url: true },
@@ -183,6 +186,7 @@ export async function getBySlug(slug: string): Promise<ProductDetail | null> {
           altText: true,
           sortOrder: true,
           isPrimary: true,
+          type: true,
         },
       },
     },

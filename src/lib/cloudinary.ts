@@ -92,7 +92,8 @@ export function isOwnCloudinaryUrl(url: string, folder: UploadFolder): boolean {
 
   if (parsed.protocol !== "https:") return false;
   if (parsed.hostname !== "res.cloudinary.com") return false;
-  // Path is /<cloudName>/image/upload/.../<folder>/<file>
+  // Path is /<cloudName>/<image|video>/upload/.../<folder>/<file> — the check is
+  // resource-type-agnostic (Phase H #7 video URLs pass the same way as images).
   if (!parsed.pathname.startsWith(`/${cloudName}/`)) return false;
   if (!parsed.pathname.includes(`/${folder}/`)) return false;
 

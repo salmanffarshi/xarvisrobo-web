@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AddToCartButton } from "@/components/product/add-to-cart-button";
+import { ProductGallery } from "@/components/product/product-gallery";
 import { RobotPlaceholder } from "@/components/product/robot-placeholder";
 import { Badge } from "@/components/ui/badge";
 import { formatBdt } from "@/lib/format";
@@ -41,45 +42,14 @@ export default async function ProductDetailPage({ params }: Props) {
   const specs = normalizeSpecs(product.specifications);
   // Ordered { title, description }[] feature highlights (Phase H #6).
   const features = normalizeFeatures(product.features);
-  // Gallery: primary first, then the rest by sort order (already sorted by the
-  // service). Empty → the SVG placeholder hero.
-  const [hero, ...moreImages] = [...product.images].sort(
-    (a, b) => Number(b.isPrimary) - Number(a.isPrimary),
-  );
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-16 sm:py-24">
       {/* Above the fold: placeholder left (60%), product info right (40%) */}
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-5 lg:gap-16">
         <div className="lg:col-span-3">
-          {hero ? (
-            <div className="space-y-3">
-              <div className="aspect-square overflow-hidden rounded-2xl bg-neutral-50">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={hero.url}
-                  alt={hero.altText ?? product.name}
-                  className="size-full object-cover"
-                />
-              </div>
-              {moreImages.length > 0 && (
-                <div className="grid grid-cols-4 gap-3">
-                  {moreImages.map((img) => (
-                    <div
-                      key={img.id}
-                      className="aspect-square overflow-hidden rounded-xl bg-neutral-50"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={img.url}
-                        alt={img.altText ?? product.name}
-                        className="size-full object-cover"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+          {product.images.length > 0 ? (
+            <ProductGallery media={product.images} productName={product.name} />
           ) : (
             <RobotPlaceholder
               slug={product.slug}

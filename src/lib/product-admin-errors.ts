@@ -4,6 +4,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  PrimaryMustBeImageError,
   ProductHasOrdersError,
   ProductNotFoundError,
   SkuTakenError,
@@ -14,6 +15,12 @@ export function productErrorResponse(error: unknown): NextResponse {
     return NextResponse.json(
       { error: { code: error.code, message: error.message } },
       { status: 404 },
+    );
+  }
+  if (error instanceof PrimaryMustBeImageError) {
+    return NextResponse.json(
+      { error: { code: error.code, message: error.message } },
+      { status: 400 },
     );
   }
   if (error instanceof SkuTakenError) {
