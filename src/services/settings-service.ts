@@ -33,6 +33,7 @@ const defaults = {
   nagadType: paymentReceivingDetails.NAGAD.accountType,
   nagadInstructions: paymentReceivingDetails.NAGAD.instructions ?? null,
   whatsappNumber: WHATSAPP_NUMBER,
+  messengerUrl: null,
   codInsideDhaka: COD_DELIVERY_INSIDE_DHAKA,
   codOutsideDhaka: COD_DELIVERY_OUTSIDE_DHAKA,
   paymentGeneralNote,

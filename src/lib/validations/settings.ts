@@ -43,6 +43,17 @@ export const updateSettingsSchema = z.object({
     .string()
     .trim()
     .regex(/^\d{10,15}$/, "Digits only, international format (e.g. 8801712345678)"),
+  // Facebook Messenger link (e.g. https://m.me/yourpage). Optional; blank means
+  // "hide the Messenger button". If present, it must be a valid http(s) URL.
+  messengerUrl: z
+    .string()
+    .trim()
+    .max(500, "Keep the link under 500 characters")
+    .refine(
+      (v) => v === "" || /^https?:\/\/.+/i.test(v),
+      "Enter a valid link starting with http:// or https://",
+    )
+    .optional(),
   codInsideDhaka: codCharge,
   codOutsideDhaka: codCharge,
   paymentGeneralNote: z

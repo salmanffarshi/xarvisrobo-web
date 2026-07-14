@@ -519,6 +519,7 @@ model Settings {
   nagadType          String
   nagadInstructions  String?
   whatsappNumber     String
+  messengerUrl       String? // full m.me/<page> or messenger link; null/empty hides the button
   codInsideDhaka     Int
   codOutsideDhaka    Int
   paymentGeneralNote String?
