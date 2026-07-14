@@ -56,6 +56,7 @@ function toDefaults(settings: Settings): UpdateSettingsInput {
     nagadType: settings.nagadType as "personal" | "merchant",
     nagadInstructions: settings.nagadInstructions ?? "",
     whatsappNumber: settings.whatsappNumber,
+    messengerUrl: settings.messengerUrl ?? "",
     codInsideDhaka: settings.codInsideDhaka,
     codOutsideDhaka: settings.codOutsideDhaka,
     paymentGeneralNote: settings.paymentGeneralNote ?? "",
@@ -294,6 +295,22 @@ export function SettingsForm({ settings }: { settings: Settings }) {
                   </FormControl>
                   <FormDescription>
                     International format, digits only (no +, no spaces).
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="messengerUrl"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-2">
+                  <FormLabel>Facebook Messenger link</FormLabel>
+                  <FormControl>
+                    <Input placeholder="https://m.me/yourpage" {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    Leave blank to hide the Messenger button.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
