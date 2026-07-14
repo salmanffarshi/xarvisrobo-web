@@ -28,6 +28,13 @@ import {
   CANCELLABLE_STATUSES,
   legalNextActions,
 } from "@/lib/order-actions";
+import {
+  notifyCancelled,
+  notifyDelivered,
+  notifyPaymentRejected,
+  notifyPreparing,
+  notifyShipped,
+} from "@/services/notification-service";
 
 import type { OrderStatus } from "@prisma/client";
 
@@ -84,7 +91,7 @@ export async function verifyPayment(
   adminId: string,
   orderNumber: string,
 ): Promise<OrderActionResult> {
-  return db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { orderNumber },
       select: {
@@ -139,8 +146,13 @@ export async function verifyPayment(
       },
     });
 
-    return { orderNumber, status: "PAYMENT_VERIFIED" };
+    return { orderNumber, status: "PAYMENT_VERIFIED" as const };
   });
+
+  // AFTER COMMIT — prepaid payment verified, order now preparing. Best-effort,
+  // non-blocking (logged, never thrown, never rolls the verification back).
+  void notifyPreparing(orderNumber);
+  return result;
 }
 
 /**
@@ -159,7 +171,7 @@ export async function rejectPayment(
     throw new ReasonRequiredError();
   }
 
-  return db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { orderNumber },
       select: {
@@ -197,8 +209,12 @@ export async function rejectPayment(
       },
     });
 
-    return { orderNumber, status: "WAITING_FOR_PAYMENT" };
+    return { orderNumber, status: "WAITING_FOR_PAYMENT" as const };
   });
+
+  // AFTER COMMIT — tell the customer why + to resubmit. Best-effort, non-blocking.
+  void notifyPaymentRejected(orderNumber, trimmed);
+  return result;
 }
 
 /**
@@ -211,7 +227,7 @@ export async function confirmCodOrder(
   adminId: string,
   orderNumber: string,
 ): Promise<OrderActionResult> {
-  return db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { orderNumber },
       select: {
@@ -253,8 +269,12 @@ export async function confirmCodOrder(
       },
     });
 
-    return { orderNumber, status: "ORDER_CONFIRMED" };
+    return { orderNumber, status: "ORDER_CONFIRMED" as const };
   });
+
+  // AFTER COMMIT — COD confirmed, order now preparing. Best-effort, non-blocking.
+  void notifyPreparing(orderNumber);
+  return result;
 }
 
 /** History note for each guided-advance target. */
@@ -291,7 +311,7 @@ export async function advanceStatus(
   orderNumber: string,
   toStatus: OrderStatus,
 ): Promise<OrderActionResult> {
-  return db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { orderNumber },
       select: {
@@ -345,6 +365,15 @@ export async function advanceStatus(
 
     return { orderNumber, status: toStatus };
   });
+
+  // AFTER COMMIT — email the customer on the two customer-visible steps.
+  // Best-effort, non-blocking (IN_PRODUCTION has no email in this set).
+  if (toStatus === "SHIPPED") {
+    void notifyShipped(orderNumber);
+  } else if (toStatus === "DELIVERED") {
+    void notifyDelivered(orderNumber);
+  }
+  return result;
 }
 
 /**
@@ -363,7 +392,7 @@ export async function cancelOrder(
     throw new ReasonRequiredError();
   }
 
-  return db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { orderNumber },
       select: { id: true, status: true },
@@ -395,8 +424,13 @@ export async function cancelOrder(
       },
     });
 
-    return { orderNumber, status: "CANCELLED" };
+    return { orderNumber, status: "CANCELLED" as const };
   });
+
+  // AFTER COMMIT — tell the customer their order was cancelled + why.
+  // Best-effort, non-blocking.
+  void notifyCancelled(orderNumber, trimmed);
+  return result;
 }
 
 /**

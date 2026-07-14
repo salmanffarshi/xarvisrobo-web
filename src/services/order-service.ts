@@ -39,6 +39,10 @@ import {
 import { computeDeliveryCharge } from "@/lib/delivery";
 import { multiplyMoney, subtractMoney, sumMoney } from "@/lib/money";
 import { generateOrderNumber } from "@/lib/order-number";
+import {
+  notifyAdminNewOrder,
+  notifyOrderPlaced,
+} from "@/services/notification-service";
 import { getSettings } from "@/services/settings-service";
 import {
   placeOrderSchema,
@@ -163,7 +167,7 @@ export async function placeOrder(
   for (let attempt = 1; attempt <= MAX_ORDER_NUMBER_ATTEMPTS; attempt++) {
     const candidateOrderNumber = generateOrderNumber();
     try {
-      return await db.$transaction(async (tx) => {
+      const result = await db.$transaction(async (tx) => {
         // 1. Cart with live products (ADR-015: live price is authoritative
         //    until this very moment, where it freezes into the order).
         const cart = await tx.cart.findUnique({
@@ -367,6 +371,14 @@ export async function placeOrder(
 
         return { orderNumber: order.orderNumber };
       });
+
+      // AFTER COMMIT — this attempt is a genuinely NEW placement (the idempotent
+      // replay paths return earlier, above and in the catch below, and never
+      // reach here). Best-effort, non-blocking: a failed send is logged inside
+      // the notify functions, never thrown, and never rolls the order back.
+      void notifyOrderPlaced(result.orderNumber);
+      void notifyAdminNewOrder(result.orderNumber);
+      return result;
     } catch (error) {
       if (isUniqueViolationOn(error, "idempotencyKey")) {
         // Concurrency-safe path: an identical submit won the race between our

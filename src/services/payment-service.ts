@@ -13,6 +13,7 @@
 
 import { db } from "@/lib/db";
 import { PAYMENT_PROOFS_FOLDER, isOwnCloudinaryUrl } from "@/lib/cloudinary";
+import { notifyAdminProofSubmitted } from "@/services/notification-service";
 import {
   submitProofSchema,
   type SubmitProofInput,
@@ -132,4 +133,9 @@ export async function submitPaymentProof(
       },
     });
   });
+
+  // AFTER COMMIT — alert the admin (Telegram) that a proof is ready to verify.
+  // Best-effort, non-blocking: a failed send is logged inside the notify
+  // function, never thrown, and never affects the recorded proof.
+  void notifyAdminProofSubmitted(orderNumber);
 }
