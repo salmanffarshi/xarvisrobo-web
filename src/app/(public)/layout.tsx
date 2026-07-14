@@ -2,6 +2,7 @@ import { CartDrawer } from "@/components/cart/cart-drawer";
 import { CartProviderServer } from "@/components/cart/cart-provider-server";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
+import { FloatingContactServer } from "@/components/contact/floating-contact-server";
 
 // Public shell — wraps all marketing/catalog pages with the real site chrome.
 // Auth pages, the customer area, and admin keep their own layouts.
@@ -20,6 +21,7 @@ export default function PublicLayout({
         <SiteFooter />
       </div>
       <CartDrawer />
+      <FloatingContactServer />
     </CartProviderServer>
   );
 }

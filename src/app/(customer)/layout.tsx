@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
+import { FloatingContactServer } from "@/components/contact/floating-contact-server";
 
 // Customer shell — the PRECISE auth gate (ADR-013): middleware is the coarse
 // edge check; this Node-runtime layout re-verifies the session and role before
@@ -45,6 +46,7 @@ export default async function CustomerLayout({
       </header>
 
       <main className="flex-1">{children}</main>
+      <FloatingContactServer />
     </div>
   );
 }
