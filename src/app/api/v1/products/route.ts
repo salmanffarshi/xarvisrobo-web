@@ -8,8 +8,12 @@ import { z } from "zod";
 
 import * as productService from "@/services/product-service";
 
-// Cache hint: fine to serve up-to-a-minute-stale catalog data.
-export const revalidate = 60;
+// This route reads `request.url` (query-string filters), so it is inherently
+// request-dependent and can never be statically rendered. Declare that up front
+// so Next doesn't attempt static optimization and log a benign
+// DYNAMIC_SERVER_USAGE warning at build time. Behavior is unchanged — the route
+// was already served dynamically.
+export const dynamic = "force-dynamic";
 
 const listQuerySchema = z.object({
   search: z.string().trim().max(120).optional(),
