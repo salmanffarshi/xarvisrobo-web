@@ -150,6 +150,7 @@ Update this list as each phase completes. Also append a one-line note to `docs/p
 - [x] Phase F — 2026-07-13 — revenue & returns: derived revenue predicate, COD-delivered-marks-paid, RETURNED status + reversal, dashboard return metrics
 - [x] Phase G — 2026-07-13 — login lands on Home (callbackUrl preserved); forgot-password (Resend email, hashed single-use 24h tokens)
 - [x] Phase H — 2026-07-13 — product features section (admin-managed, ordered) + interactive gallery with Cloudinary image+video
+- [x] Phase I — 2026-07-14 — notifications: customer emails (placed/preparing/shipped/delivered/rejected/cancelled) + admin Telegram (new order, proof submitted); after-commit, best-effort
 
 ## Reference documents
 
