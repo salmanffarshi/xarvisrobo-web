@@ -52,6 +52,31 @@ export async function getSettings(): Promise<Settings> {
 }
 
 /**
+ * The two contact-channel fields only (Phase J.1). Selected narrowly on purpose:
+ * this result is awaited inside a Server Component that renders a Client
+ * Component, and React serializes the awaited value into the RSC payload — so
+ * returning the full Settings row here would leak every field to the browser.
+ * Selecting just these two keeps the client payload to exactly what the floating
+ * buttons need. Self-heals via getSettings() if the singleton is somehow absent.
+ */
+export async function getContactSettings(): Promise<{
+  whatsappNumber: string;
+  messengerUrl: string | null;
+}> {
+  const row = await db.settings.findUnique({
+    where: { id: SINGLETON_ID },
+    select: { whatsappNumber: true, messengerUrl: true },
+  });
+  if (row) return row;
+
+  const settings = await getSettings();
+  return {
+    whatsappNumber: settings.whatsappNumber,
+    messengerUrl: settings.messengerUrl,
+  };
+}
+
+/**
  * Update the settings singleton. `adminId` is the acting staff id (the route
  * has already staff-guarded the request); Settings carries no author column, so
  * it is not persisted. Input is validated at this boundary before the write.
