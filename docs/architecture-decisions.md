@@ -646,3 +646,84 @@ replacing the old DELIVERED-only sum); `returnedOrders` (count) and `returnedVal
 inventory restore on return, need revenue recognised at a different point (e.g.
 shipment), or the derived query becomes a performance concern at scale (would add a
 maintained aggregate, not change the rule).
+
+---
+
+## ADR-019: placeOrder transaction scope + serverless notification dispatch
+
+**Date:** 2026-07-15 (Phase J production hotfix)
+
+**Context:** Two production-only failures in the checkout path, both invisible
+locally because `next dev` runs a long-lived Node process on a same-host DB
+(~1ms round-trips, no function freeze):
+
+- **P2024** — the after-commit notification hooks were fire-and-forget
+  `void notify...(orderNumber)`, and each re-queried the order via
+  `prisma.order.findUnique()`. On Vercel the function is frozen the instant the
+  201 response returns, so that un-awaited query was orphaned on a suspended
+  function and timed out acquiring a connection from Prisma's internal pool.
+- **P2028 "Transaction not found"** — `placeOrder`'s interactive `$transaction`
+  ran on Prisma's default 5000ms timeout. Vercel (US) ↔ Neon (Singapore,
+  ADR-011) round-trips are cross-region (~6–9 sequential per placement, plus a
+  Neon serverless cold-wake) and exceeded 5s; Prisma then closes the tx and the
+  next `tx.*` call — `cartItem.deleteMany`, the last op — throws P2028, rolling
+  back the whole order so NO order was created. It surfaced right after the
+  P2024 fix because that widened `order.create`'s select with a `user` relation
+  load, nudging borderline transactions over the 5s edge.
+
+**Decision:**
+
+(a) **Notifications receive a plain pre-built payload — no post-commit
+re-query.** `placeOrder` builds an `OrderNotification` (plain serializable data)
+from what its transaction already computed, and the senders do zero DB reads.
+Dispatch is via `next/server` **`after()`** — it runs the send after the
+response is flushed and keeps the serverless function alive until it finishes,
+so nothing is orphaned and zero latency is added to checkout. Still best-effort:
+each sender is try/caught, logs its own failure, never throws, never blocks or
+rolls back an order. Admin-triggered hooks that don't hold the order data use a
+`withOrderNotification(orderNumber, send)` helper — one plain read, awaited
+inside `after()` so it too is never orphaned.
+
+(b) **placeOrder's transaction options raised** from Prisma's defaults
+(`maxWait: 2000`, `timeout: 5000`) to **`{ maxWait: 5000, timeout: 15000 }`** —
+15s covers the worst realistic cross-region + cold-wake case with headroom while
+still bounding a genuinely stuck transaction; the 5s maxWait tolerates a cold
+connection acquisition.
+
+(c) **The cart read and the address ownership check moved OUTSIDE the
+transaction** (read once, before the orderNumber-retry loop), along with their
+pure derivations (line items, subtotal, delivery charge, initial status, address
+snapshot). Everything requiring atomicity stays inside the transaction: the
+coupon `SELECT … FOR UPDATE` lock + counts + validation (ADR-017 race-safety),
+the total computation, the order + items + payment + status-history nested
+create with JSON snapshots, the coupon redemption insert, and the cart clear
+(`cartItem.deleteMany`).
+
+**Tradeoff (explicit):** moving those reads out introduces a small **TOCTOU
+window** — the cart and its prices are read a few hundred ms before commit, so a
+concurrent cart change in another tab could be missed by the order that then
+clears the whole cart. Accepted: the window is tiny, single-user self-races on
+one cart during a single checkout are not a real threat, and everything that
+requires atomicity (writes + the coupon row-lock + cart clear) remains inside
+the transaction. **Revisit if** concurrent-tab cart edits ever cause real
+issues (would reintroduce a transactional cart read or a cart-row lock).
+
+**Unchanged:** ADR-005 (server-side price computation — totals are still
+recomputed server-side from live DB prices, client-sent totals ignored), the
+idempotency design (`Order.idempotencyKey` unique + fast-path + unique-violation
+race handling), and the ADR-004 JSON snapshots (address + product frozen at
+`order.create`). No checkout business logic changed.
+
+**Verified** locally over the full HTTP stack (real customer JWT sessions):
+prepaid+coupon and COD placements → 201; cart cleared; server-side pricing
+(injected body totals ignored); snapshot immutability (order address unchanged
+after the saved address was edited); idempotent replay → same order + exactly
+one coupon redemption; coupon cap → 409; ownership → 404; best-effort
+notifications (forced throw → order still 201, error logged via `after()`); COD
+gate (no Manufacturing row, PENDING payment). No P2028, no 500s.
+
+**Secondary hardening (Vercel env, no repo change):** append
+`connect_timeout=15&pool_timeout=15` to the production `DATABASE_URL`; consider
+Neon's pooled (`-pooler`) endpoint with `pgbouncer=true` if connection
+contention recurs. This is compounding-latency insurance only — (b)+(c) are the
+actual cure.
