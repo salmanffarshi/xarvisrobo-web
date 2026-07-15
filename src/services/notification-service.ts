@@ -5,12 +5,20 @@ import "server-only";
 // sendEmail helper, admin alerts via the Telegram client.
 //
 // CORE PRINCIPLE — notifications are AFTER-COMMIT, BEST-EFFORT, NON-BLOCKING.
-// Every function is async and fully wrapped in try/catch: a failed email or
-// Telegram send is logged, never thrown. Callers fire-and-forget with
-// `void notify...(orderNumber)` immediately AFTER their transaction commits — a
-// notification can never roll back or break the order operation. The read model
-// is loaded here with a PLAIN read (db.order.findUnique), never inside a
-// transaction, so no tx is held open across a network call.
+// Every sender is async and fully wrapped in try/catch: a failed email or
+// Telegram send is logged, never thrown.
+//
+// PAYLOAD, NOT orderNumber. Each notify* takes a pre-built `OrderNotification`
+// and does NO DB read of its own. The caller supplies the data:
+//   - placeOrder builds it from what its transaction already computed (zero
+//     post-commit reads on the hot checkout path);
+//   - the admin hooks, which don't hold the full order, use
+//     `withOrderNotification(orderNumber, send)` — ONE plain read, then send.
+// Callers schedule the send with Next's `after()` (runs after the response is
+// sent, and Vercel keeps the function alive until it finishes). This replaced the
+// old `void notify...()` fire-and-forget, which on Vercel left the send — and its
+// re-query — orphaned on a frozen function, timing out on connection acquisition
+// (P2024). No send ever runs inside a transaction.
 
 import { db } from "@/lib/db";
 import { sendEmail } from "@/lib/email/client";
@@ -27,7 +35,8 @@ import { DELIVERY_ZONE_LABELS } from "@/lib/delivery";
 import { formatBdt } from "@/lib/format";
 import { PAYMENT_METHOD_LABELS } from "@/lib/payment-display";
 import { sendTelegram } from "@/lib/telegram";
-import { getSettings } from "@/services/settings-service";
+
+import type { Settings } from "@prisma/client";
 
 // Absolute base for links in emails — same fallback chain as password-reset.
 const APP_URL =
@@ -38,49 +47,78 @@ function orderUrl(orderNumber: string): string {
 }
 
 /** The read model both channels build from — OrderEmailData plus the customer's
- * email address (the To). */
-type OrderNotification = OrderEmailData & { customerEmail: string };
+ * email address (the To). Built either from data a service already holds
+ * (placeOrder — no DB read) or by `withOrderNotification`'s plain read (admin
+ * hooks). */
+export type OrderNotification = OrderEmailData & { customerEmail: string };
 
 /**
- * Plain read (NOT a transaction) of everything a notification needs. Returns null
- * if the order vanished between commit and this read (nothing to send).
+ * Plain read (NOT a transaction) of everything a notification needs. Best-effort:
+ * returns null — logged, never thrown — if the order vanished between commit and
+ * this read, or if the read itself failed, so a caller (and `after()`) never sees
+ * an exception.
  */
-async function loadOrder(orderNumber: string): Promise<OrderNotification | null> {
-  const order = await db.order.findUnique({
-    where: { orderNumber },
-    include: {
-      user: { select: { name: true, email: true } },
-      items: {
-        orderBy: { id: "asc" },
-        select: { quantity: true, lineTotal: true, productSnapshot: true },
+async function loadOrderNotification(
+  orderNumber: string,
+): Promise<OrderNotification | null> {
+  try {
+    const order = await db.order.findUnique({
+      where: { orderNumber },
+      include: {
+        user: { select: { name: true, email: true } },
+        items: {
+          orderBy: { id: "asc" },
+          select: { quantity: true, lineTotal: true, productSnapshot: true },
+        },
       },
-    },
-  });
-  if (!order) {
+    });
+    if (!order) {
+      return null;
+    }
+
+    return {
+      orderNumber: order.orderNumber,
+      customerName: order.user.name,
+      customerEmail: order.user.email,
+      paymentMethod: order.paymentMethod,
+      deliveryZone: order.deliveryZone,
+      contactPhone: order.contactPhone,
+      subtotal: order.subtotal.toFixed(2),
+      discountAmount: order.discountAmount.toFixed(2),
+      couponCode: order.couponCode,
+      deliveryCharge: order.deliveryCharge.toFixed(2),
+      total: order.total.toFixed(2),
+      items: order.items.map((item) => {
+        const snapshot = item.productSnapshot as { name: string };
+        return {
+          name: snapshot.name,
+          quantity: item.quantity,
+          lineTotal: item.lineTotal.toFixed(2),
+        };
+      }),
+    };
+  } catch (err) {
+    console.error("[notify] load order failed:", err);
     return null;
   }
+}
 
-  return {
-    orderNumber: order.orderNumber,
-    customerName: order.user.name,
-    customerEmail: order.user.email,
-    paymentMethod: order.paymentMethod,
-    deliveryZone: order.deliveryZone,
-    contactPhone: order.contactPhone,
-    subtotal: order.subtotal.toFixed(2),
-    discountAmount: order.discountAmount.toFixed(2),
-    couponCode: order.couponCode,
-    deliveryCharge: order.deliveryCharge.toFixed(2),
-    total: order.total.toFixed(2),
-    items: order.items.map((item) => {
-      const snapshot = item.productSnapshot as { name: string };
-      return {
-        name: snapshot.name,
-        quantity: item.quantity,
-        lineTotal: item.lineTotal.toFixed(2),
-      };
-    }),
-  };
+/**
+ * For hooks that DON'T already hold the order data (the admin actions): load the
+ * payload with ONE plain read, then run `send`. Best-effort — never throws, so it
+ * is safe to hand straight to `after()`. Because it runs inside `after()`, the
+ * read is NOT orphaned on a serverless freeze (the P2024 the old void-fire caused).
+ * placeOrder does NOT use this — it builds the payload from data already in its
+ * transaction, so its hot path does zero post-commit reads.
+ */
+export async function withOrderNotification(
+  orderNumber: string,
+  send: (order: OrderNotification) => Promise<void>,
+): Promise<void> {
+  const order = await loadOrderNotification(orderNumber);
+  if (order) {
+    await send(order);
+  }
 }
 
 /** Escape user-supplied text for Telegram's HTML parse_mode. */
@@ -93,15 +131,15 @@ function escapeHtml(text: string): string {
 
 // --- CUSTOMER EMAILS -------------------------------------------------------
 
-export async function notifyOrderPlaced(orderNumber: string): Promise<void> {
+export async function notifyOrderPlaced(
+  order: OrderNotification,
+  settings: Settings,
+): Promise<void> {
   try {
-    const order = await loadOrder(orderNumber);
-    if (!order) return;
-    const settings = await getSettings();
     const { subject, html, text } = orderPlacedEmail(
       order,
       settings,
-      orderUrl(orderNumber),
+      orderUrl(order.orderNumber),
     );
     await sendEmail({ to: order.customerEmail, subject, html, text });
   } catch (err) {
@@ -109,33 +147,36 @@ export async function notifyOrderPlaced(orderNumber: string): Promise<void> {
   }
 }
 
-export async function notifyPreparing(orderNumber: string): Promise<void> {
+export async function notifyPreparing(order: OrderNotification): Promise<void> {
   try {
-    const order = await loadOrder(orderNumber);
-    if (!order) return;
-    const { subject, html, text } = orderPreparingEmail(order, orderUrl(orderNumber));
+    const { subject, html, text } = orderPreparingEmail(
+      order,
+      orderUrl(order.orderNumber),
+    );
     await sendEmail({ to: order.customerEmail, subject, html, text });
   } catch (err) {
     console.error("[notify] preparing failed:", err);
   }
 }
 
-export async function notifyShipped(orderNumber: string): Promise<void> {
+export async function notifyShipped(order: OrderNotification): Promise<void> {
   try {
-    const order = await loadOrder(orderNumber);
-    if (!order) return;
-    const { subject, html, text } = orderShippedEmail(order, orderUrl(orderNumber));
+    const { subject, html, text } = orderShippedEmail(
+      order,
+      orderUrl(order.orderNumber),
+    );
     await sendEmail({ to: order.customerEmail, subject, html, text });
   } catch (err) {
     console.error("[notify] shipped failed:", err);
   }
 }
 
-export async function notifyDelivered(orderNumber: string): Promise<void> {
+export async function notifyDelivered(order: OrderNotification): Promise<void> {
   try {
-    const order = await loadOrder(orderNumber);
-    if (!order) return;
-    const { subject, html, text } = orderDeliveredEmail(order, orderUrl(orderNumber));
+    const { subject, html, text } = orderDeliveredEmail(
+      order,
+      orderUrl(order.orderNumber),
+    );
     await sendEmail({ to: order.customerEmail, subject, html, text });
   } catch (err) {
     console.error("[notify] delivered failed:", err);
@@ -143,16 +184,14 @@ export async function notifyDelivered(orderNumber: string): Promise<void> {
 }
 
 export async function notifyPaymentRejected(
-  orderNumber: string,
+  order: OrderNotification,
   reason: string,
 ): Promise<void> {
   try {
-    const order = await loadOrder(orderNumber);
-    if (!order) return;
     const { subject, html, text } = paymentRejectedEmail(
       order,
       reason,
-      orderUrl(orderNumber),
+      orderUrl(order.orderNumber),
     );
     await sendEmail({ to: order.customerEmail, subject, html, text });
   } catch (err) {
@@ -161,16 +200,14 @@ export async function notifyPaymentRejected(
 }
 
 export async function notifyCancelled(
-  orderNumber: string,
+  order: OrderNotification,
   reason: string,
 ): Promise<void> {
   try {
-    const order = await loadOrder(orderNumber);
-    if (!order) return;
     const { subject, html, text } = orderCancelledEmail(
       order,
       reason,
-      orderUrl(orderNumber),
+      orderUrl(order.orderNumber),
     );
     await sendEmail({ to: order.customerEmail, subject, html, text });
   } catch (err) {
@@ -180,10 +217,10 @@ export async function notifyCancelled(
 
 // --- ADMIN TELEGRAM --------------------------------------------------------
 
-export async function notifyAdminNewOrder(orderNumber: string): Promise<void> {
+export async function notifyAdminNewOrder(
+  order: OrderNotification,
+): Promise<void> {
   try {
-    const order = await loadOrder(orderNumber);
-    if (!order) return;
     const items = order.items
       .map((item) => ` • ${item.quantity}× ${escapeHtml(item.name)}`)
       .join("\n");
@@ -203,11 +240,9 @@ export async function notifyAdminNewOrder(orderNumber: string): Promise<void> {
 }
 
 export async function notifyAdminProofSubmitted(
-  orderNumber: string,
+  order: OrderNotification,
 ): Promise<void> {
   try {
-    const order = await loadOrder(orderNumber);
-    if (!order) return;
     const text = [
       `💳 <b>Payment proof submitted — ${escapeHtml(order.orderNumber)}</b>`,
       `Customer: ${escapeHtml(order.customerName)}`,

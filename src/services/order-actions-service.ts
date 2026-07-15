@@ -22,6 +22,8 @@
 // with the UI, so the buttons rendered never diverge from what these guards
 // enforce.
 
+import { after } from "next/server";
+
 import { db } from "@/lib/db";
 import {
   ADVANCE_MAP,
@@ -34,6 +36,7 @@ import {
   notifyPaymentRejected,
   notifyPreparing,
   notifyShipped,
+  withOrderNotification,
 } from "@/services/notification-service";
 
 import type { OrderStatus } from "@prisma/client";
@@ -149,9 +152,11 @@ export async function verifyPayment(
     return { orderNumber, status: "PAYMENT_VERIFIED" as const };
   });
 
-  // AFTER COMMIT — prepaid payment verified, order now preparing. Best-effort,
-  // non-blocking (logged, never thrown, never rolls the verification back).
-  void notifyPreparing(orderNumber);
+  // AFTER COMMIT — prepaid payment verified, order now preparing. `after()` runs
+  // the send once the response is sent and keeps the function alive until it
+  // finishes (not orphaned on a serverless freeze). Best-effort: withOrderNotification
+  // + notify log their own failures, never throw, never roll the verification back.
+  after(() => withOrderNotification(orderNumber, notifyPreparing));
   return result;
 }
 
@@ -212,8 +217,11 @@ export async function rejectPayment(
     return { orderNumber, status: "WAITING_FOR_PAYMENT" as const };
   });
 
-  // AFTER COMMIT — tell the customer why + to resubmit. Best-effort, non-blocking.
-  void notifyPaymentRejected(orderNumber, trimmed);
+  // AFTER COMMIT — tell the customer why + to resubmit. Best-effort, non-blocking
+  // (see verifyPayment for the after()/withOrderNotification rationale).
+  after(() =>
+    withOrderNotification(orderNumber, (n) => notifyPaymentRejected(n, trimmed)),
+  );
   return result;
 }
 
@@ -272,8 +280,9 @@ export async function confirmCodOrder(
     return { orderNumber, status: "ORDER_CONFIRMED" as const };
   });
 
-  // AFTER COMMIT — COD confirmed, order now preparing. Best-effort, non-blocking.
-  void notifyPreparing(orderNumber);
+  // AFTER COMMIT — COD confirmed, order now preparing. Best-effort, non-blocking
+  // (see verifyPayment for the after()/withOrderNotification rationale).
+  after(() => withOrderNotification(orderNumber, notifyPreparing));
   return result;
 }
 
@@ -367,11 +376,12 @@ export async function advanceStatus(
   });
 
   // AFTER COMMIT — email the customer on the two customer-visible steps.
-  // Best-effort, non-blocking (IN_PRODUCTION has no email in this set).
+  // Best-effort, non-blocking (IN_PRODUCTION has no email in this set); see
+  // verifyPayment for the after()/withOrderNotification rationale.
   if (toStatus === "SHIPPED") {
-    void notifyShipped(orderNumber);
+    after(() => withOrderNotification(orderNumber, notifyShipped));
   } else if (toStatus === "DELIVERED") {
-    void notifyDelivered(orderNumber);
+    after(() => withOrderNotification(orderNumber, notifyDelivered));
   }
   return result;
 }
@@ -427,9 +437,11 @@ export async function cancelOrder(
     return { orderNumber, status: "CANCELLED" as const };
   });
 
-  // AFTER COMMIT — tell the customer their order was cancelled + why.
-  // Best-effort, non-blocking.
-  void notifyCancelled(orderNumber, trimmed);
+  // AFTER COMMIT — tell the customer their order was cancelled + why. Best-effort,
+  // non-blocking (see verifyPayment for the after()/withOrderNotification rationale).
+  after(() =>
+    withOrderNotification(orderNumber, (n) => notifyCancelled(n, trimmed)),
+  );
   return result;
 }
 

@@ -11,9 +11,14 @@
 // do. Ownership is enforced by scoping the load to userId — an unowned or
 // nonexistent orderNumber both surface as ORDER_NOT_FOUND (no info leak).
 
+import { after } from "next/server";
+
 import { db } from "@/lib/db";
 import { PAYMENT_PROOFS_FOLDER, isOwnCloudinaryUrl } from "@/lib/cloudinary";
-import { notifyAdminProofSubmitted } from "@/services/notification-service";
+import {
+  notifyAdminProofSubmitted,
+  withOrderNotification,
+} from "@/services/notification-service";
 import {
   submitProofSchema,
   type SubmitProofInput,
@@ -135,7 +140,9 @@ export async function submitPaymentProof(
   });
 
   // AFTER COMMIT — alert the admin (Telegram) that a proof is ready to verify.
-  // Best-effort, non-blocking: a failed send is logged inside the notify
-  // function, never thrown, and never affects the recorded proof.
-  void notifyAdminProofSubmitted(orderNumber);
+  // `after()` runs the send once the response is sent and keeps the function
+  // alive until it finishes (not orphaned on a serverless freeze). Best-effort:
+  // withOrderNotification + notify log their own failures, never throw, and never
+  // affect the recorded proof.
+  after(() => withOrderNotification(orderNumber, notifyAdminProofSubmitted));
 }

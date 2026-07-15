@@ -22,6 +22,8 @@
 //
 // Pre-order model: no stock checks, no stock decrement.
 
+import { after } from "next/server";
+
 import {
   Prisma,
   type DiscountType,
@@ -42,6 +44,7 @@ import { generateOrderNumber } from "@/lib/order-number";
 import {
   notifyAdminNewOrder,
   notifyOrderPlaced,
+  type OrderNotification,
 } from "@/services/notification-service";
 import { getSettings } from "@/services/settings-service";
 import {
@@ -347,7 +350,11 @@ export async function placeOrder(
               },
             },
           },
-          select: { id: true, orderNumber: true },
+          select: {
+            id: true,
+            orderNumber: true,
+            user: { select: { name: true, email: true } },
+          },
         });
 
         // 10. Record the coupon redemption (Phase E.5), inside the same txn and
@@ -369,16 +376,47 @@ export async function placeOrder(
         // above rolls this back and the cart survives untouched.
         await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
 
-        return { orderNumber: order.orderNumber };
+        // Build the notification payload from data THIS transaction already has
+        // (line items, server-computed totals, the customer's name/email) — so
+        // the after-commit send needs NO post-commit re-read of the order. This
+        // is what removes the failing `order.findUnique` from the hot path.
+        const notification: OrderNotification = {
+          orderNumber: order.orderNumber,
+          customerName: order.user.name,
+          customerEmail: order.user.email,
+          paymentMethod: parsed.paymentMethod,
+          deliveryZone: parsed.deliveryZone,
+          contactPhone: parsed.contactPhone,
+          subtotal,
+          discountAmount,
+          couponCode: normalizedCouponCode,
+          deliveryCharge,
+          total,
+          items: lines.map((line) => ({
+            name: line.product.name,
+            quantity: line.quantity,
+            lineTotal: line.lineTotal,
+          })),
+        };
+
+        return { orderNumber: order.orderNumber, notification };
       });
 
       // AFTER COMMIT — this attempt is a genuinely NEW placement (the idempotent
       // replay paths return earlier, above and in the catch below, and never
-      // reach here). Best-effort, non-blocking: a failed send is logged inside
-      // the notify functions, never thrown, and never rolls the order back.
-      void notifyOrderPlaced(result.orderNumber);
-      void notifyAdminNewOrder(result.orderNumber);
-      return result;
+      // reach here, so a replay never re-notifies). `after()` runs these once the
+      // response is sent and keeps the serverless function alive until they
+      // finish — so the send actually completes (not orphaned on a freeze) yet
+      // adds zero latency to checkout. Best-effort: each notify logs its own
+      // failure, never throws, never rolls the order back. No post-commit DB read
+      // — the payload was built inside the committed transaction above.
+      after(() =>
+        Promise.all([
+          notifyOrderPlaced(result.notification, settings),
+          notifyAdminNewOrder(result.notification),
+        ]),
+      );
+      return { orderNumber: result.orderNumber };
     } catch (error) {
       if (isUniqueViolationOn(error, "idempotencyKey")) {
         // Concurrency-safe path: an identical submit won the race between our
