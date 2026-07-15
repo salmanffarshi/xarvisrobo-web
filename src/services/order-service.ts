@@ -167,64 +167,106 @@ export async function placeOrder(
     ? normalizeCode(parsed.couponCode)
     : null;
 
+  // Reads + pure derivations that need NO transactional consistency run BEFORE
+  // the transaction (and once, not per orderNumber-collision retry), so they
+  // don't count against the interactive-tx timeout budget — on Vercel↔Neon
+  // (US↔Singapore) every round-trip is cross-region, and P2028 "Transaction not
+  // found" is thrown when the tx exceeds its timeout mid-flight. What STAYS in
+  // the tx: the coupon FOR-UPDATE lock, all writes, and the cart clear — so
+  // atomicity and the ADR-017 coupon race-safety are unchanged. These lookups
+  // only touch the caller's own rows and nothing the tx writes depends on
+  // reading them inside the tx, so hoisting them changes no guarantee.
+
+  // 1. Cart with live products (ADR-015: live price is authoritative until the
+  //    order.create below, where it freezes into the order).
+  const cart = await db.cart.findUnique({
+    where: { userId },
+    include: {
+      items: {
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+              slug: true,
+              specifications: true,
+              basePrice: true,
+              isActive: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+  });
+  if (!cart || cart.items.length === 0) {
+    throw new EmptyCartError();
+  }
+
+  // 2. Every line must still be purchasable.
+  for (const item of cart.items) {
+    if (!item.product.isActive) {
+      throw new ProductUnavailableError(item.product.name);
+    }
+  }
+
+  // 3. Address ownership — someone else's addressId is a miss.
+  const address = await db.address.findFirst({
+    where: { id: parsed.addressId, userId },
+  });
+  if (!address) {
+    throw new AddressNotFoundError();
+  }
+
+  // 4. Server-side totals (ADR-005), decimal strings throughout.
+  const lines = cart.items.map((item) => {
+    const unitPrice = item.product.basePrice.toFixed(2);
+    return {
+      product: item.product,
+      quantity: item.quantity,
+      unitPrice,
+      lineTotal: multiplyMoney(unitPrice, item.quantity),
+    };
+  });
+  const subtotal = sumMoney(lines.map((line) => line.lineTotal));
+
+  // Charge from method + the customer's chosen zone (ADR-016), via the same
+  // helper the checkout summary uses so display and stored agree. Delivery is
+  // NEVER discounted (ADR-017) — the coupon touches subtotal only.
+  const deliveryCharge = computeDeliveryCharge(
+    parsed.paymentMethod,
+    parsed.deliveryZone,
+    codCharges,
+  );
+
+  // Method-specific initial status (ADR-016): COD waits for a phone
+  // confirmation; prepaid waits for payment. Neither enters production here —
+  // that's a Phase E gate.
+  const initialStatus: OrderStatus =
+    parsed.paymentMethod === "COD"
+      ? "WAITING_FOR_ORDER_CONFIRMATION"
+      : "WAITING_FOR_PAYMENT";
+
+  const shippingAddress: ShippingAddressSnapshot = {
+    label: address.label,
+    recipientName: address.recipientName,
+    phone: address.phone,
+    streetAddress: address.streetAddress,
+    city: address.city,
+    district: address.district,
+    postalCode: address.postalCode,
+  };
+
   for (let attempt = 1; attempt <= MAX_ORDER_NUMBER_ATTEMPTS; attempt++) {
     const candidateOrderNumber = generateOrderNumber();
     try {
+      // Explicit tx budget: the default 5000ms is too tight for cross-region
+      // Vercel↔Neon round-trips + a Neon serverless cold-wake, which is what
+      // tripped P2028 in production. 15s covers the worst realistic case with
+      // headroom while still bounding a genuinely stuck transaction; maxWait
+      // 5s tolerates a cold connection acquisition.
       const result = await db.$transaction(async (tx) => {
-        // 1. Cart with live products (ADR-015: live price is authoritative
-        //    until this very moment, where it freezes into the order).
-        const cart = await tx.cart.findUnique({
-          where: { userId },
-          include: {
-            items: {
-              include: {
-                product: {
-                  select: {
-                    id: true,
-                    name: true,
-                    sku: true,
-                    slug: true,
-                    specifications: true,
-                    basePrice: true,
-                    isActive: true,
-                  },
-                },
-              },
-              orderBy: { createdAt: "asc" },
-            },
-          },
-        });
-        if (!cart || cart.items.length === 0) {
-          throw new EmptyCartError();
-        }
-
-        // 2. Every line must still be purchasable.
-        for (const item of cart.items) {
-          if (!item.product.isActive) {
-            throw new ProductUnavailableError(item.product.name);
-          }
-        }
-
-        // 3. Address ownership — someone else's addressId is a miss.
-        const address = await tx.address.findFirst({
-          where: { id: parsed.addressId, userId },
-        });
-        if (!address) {
-          throw new AddressNotFoundError();
-        }
-
-        // 4. Server-side totals (ADR-005), decimal strings throughout.
-        const lines = cart.items.map((item) => {
-          const unitPrice = item.product.basePrice.toFixed(2);
-          return {
-            product: item.product,
-            quantity: item.quantity,
-            unitPrice,
-            lineTotal: multiplyMoney(unitPrice, item.quantity),
-          };
-        });
-        const subtotal = sumMoney(lines.map((line) => line.lineTotal));
-
         // 4b. Coupon redemption (Phase E.5), race-safe. Lock the Coupon row
         //     FOR UPDATE so concurrent placements of the same coupon serialize:
         //     the second waits here, then counts redemptions AFTER the first
@@ -268,38 +310,16 @@ export async function placeOrder(
           appliedCouponId = coupon.id;
         }
 
-        // Charge from method + the customer's chosen zone (ADR-016), via the
-        // same helper the checkout summary uses so display and stored agree.
+        // total = subtotal − discount + delivery, always ≥ delivery ≥ 0
+        // (discount is capped at the subtotal). deliveryCharge was computed
+        // pre-tx (method + zone only); discountAmount is the only piece that
+        // depends on the coupon lock above, so only `total` is finalized here.
         // Delivery is NEVER discounted (ADR-017) — the coupon touches subtotal
-        // only. total = subtotal − discount + delivery, always ≥ delivery ≥ 0
-        // (discount is capped at the subtotal).
-        const deliveryCharge = computeDeliveryCharge(
-          parsed.paymentMethod,
-          parsed.deliveryZone,
-          codCharges,
-        );
+        // only.
         const total = sumMoney([
           subtractMoney(subtotal, discountAmount),
           deliveryCharge,
         ]);
-
-        // 5. Method-specific initial status (ADR-016): COD waits for a phone
-        //    confirmation; prepaid waits for payment. Neither enters production
-        //    here — that's a Phase E gate.
-        const initialStatus: OrderStatus =
-          parsed.paymentMethod === "COD"
-            ? "WAITING_FOR_ORDER_CONFIRMATION"
-            : "WAITING_FOR_PAYMENT";
-
-        const shippingAddress: ShippingAddressSnapshot = {
-          label: address.label,
-          recipientName: address.recipientName,
-          phone: address.phone,
-          streetAddress: address.streetAddress,
-          city: address.city,
-          district: address.district,
-          postalCode: address.postalCode,
-        };
 
         // 6.–9. Order + items + payment + history in one nested create. NO
         // Manufacturing row here (ADR-016) — it's created only at the Phase E
@@ -400,7 +420,7 @@ export async function placeOrder(
         };
 
         return { orderNumber: order.orderNumber, notification };
-      });
+      }, { maxWait: 5000, timeout: 15000 });
 
       // AFTER COMMIT — this attempt is a genuinely NEW placement (the idempotent
       // replay paths return earlier, above and in the catch below, and never
