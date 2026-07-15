@@ -6,9 +6,20 @@
 //
 // Middleware runs on the Edge runtime: no bcrypt, no full Node APIs, no direct
 // DB work of its own. It only inspects the Auth.js session exposed as `req.auth`.
+//
+// It builds its OWN NextAuth instance from the edge-safe `authConfig` half
+// (src/auth.config.ts) — NOT from `@/auth`. Importing `@/auth` here would drag
+// Prisma, bcrypt, and the Prisma adapter into the Edge bundle (>1 MB, over
+// Vercel's limit). `authConfig` imports none of those, so the edge stays lean.
+// The session `role` claim it reads is populated by authConfig's session
+// callback; that is all the coarse route-protection below needs.
 
-import { auth } from "@/auth";
+import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
+
+import { authConfig } from "@/auth.config";
+
+const { auth } = NextAuth(authConfig);
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;

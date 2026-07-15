@@ -1,4 +1,4 @@
-// Auth.js (NextAuth v5) — single instance for the whole app.
+// Auth.js (NextAuth v5) — NODE half of the split config.
 //
 // Per ADR-013 we run ONE Auth.js instance with TWO Credentials providers,
 // not two isolated instances. The security boundary is the per-provider
@@ -12,32 +12,32 @@
 // read them with no DB call. The security intent is preserved by (a) an
 // `isActive` re-check in the jwt callback on the Node runtime, and (b) role
 // re-validation at the service layer for sensitive actions (ADR-013).
+//
+// SPLIT CONFIG: the edge-safe pieces (session/pages/session-callback) live in
+// `src/auth.config.ts`, which the Edge middleware imports on its own. This file
+// is the Node half — it spreads that base and adds the Prisma adapter, the two
+// Credentials providers (Prisma + bcrypt `authorize`), and the DB-backed jwt
+// callback (the `isActive` deactivation re-check). None of those Node-only
+// imports reach the edge, keeping the middleware bundle under Vercel's 1 MB cap.
+// This instance's `auth()` is what every service/route/layout guard calls, so
+// the deactivation check remains fully enforced on the Node side.
 
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 
-import type { UserRole } from "@prisma/client";
+import { authConfig } from "@/auth.config";
 import { db } from "@/lib/db";
 import { customerLoginSchema, adminLoginSchema } from "@/lib/validations/auth";
 import { isStaff } from "@/lib/permissions";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // Inherit the edge-safe base (session strategy, pages, session callback).
+  ...authConfig,
   // The Prisma adapter still manages the User and Account tables. Only the
   // Session table goes unused under JWT strategy (kept in the schema for now).
   adapter: PrismaAdapter(db),
-  session: {
-    // 30 days is the hard cap for the signed JWT cookie. Staff sessions are
-    // expired earlier (8h) via the role-based `expiresAt` in the jwt callback.
-    strategy: "jwt",
-    maxAge: 60 * 60 * 24 * 30,
-  },
-  pages: {
-    // Customer-facing sign-in page. Admin login uses its own page and a
-    // hard-coded redirect flow, so it does not rely on this setting.
-    signIn: "/login",
-  },
   providers: [
     // ── Provider 1: customers ────────────────────────────────────────────
     // Only authenticates users whose role is exactly CUSTOMER.
@@ -119,9 +119,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
+    // Inherit the edge-safe `session` callback (token → session.user copy) from
+    // the base config, then add the Node-only `jwt` callback below.
+    ...authConfig.callbacks,
     // Runs on sign-in and on every subsequent request that resolves the
-    // session (including edge middleware). Under JWT strategy this is where
-    // identity + role live and where we enforce expiry / deactivation.
+    // session on the NODE runtime (services / routes / layouts via `auth()`).
+    // Under JWT strategy this is where identity + role live and where we
+    // enforce expiry / deactivation. It is NOT part of the edge config, so the
+    // DB `isActive` re-check never reaches the edge bundle.
     jwt: async ({ token, user }) => {
       // ── Sign-in: `user` comes from a provider's authorize(). ──
       if (user) {
@@ -159,19 +164,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       return token;
-    },
-
-    // Copy id + role from the token onto `session.user` so `session.user.role`
-    // is available everywhere. The custom token fields read back as `unknown`
-    // (see the note in src/types/next-auth.d.ts), so we guard them.
-    session: ({ session, token }) => {
-      if (typeof token.id === "string") {
-        session.user.id = token.id;
-      }
-      if (typeof token.role === "string") {
-        session.user.role = token.role as UserRole;
-      }
-      return session;
     },
   },
 });
