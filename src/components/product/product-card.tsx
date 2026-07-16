@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
@@ -17,12 +18,17 @@ export function ProductCard({ product }: { product: ProductCardData }) {
     >
       <div className="relative p-3">
         {product.primaryImageUrl ? (
-          <div className="aspect-square overflow-hidden rounded-xl bg-neutral-50">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+          <div className="relative aspect-square overflow-hidden rounded-xl bg-neutral-50">
+            {/* next/image + custom Cloudinary loader: the srcset requests
+                f_auto,q_auto,w_<device-width> derivatives instead of the
+                full-res original. `sizes` matches the grid (1 col mobile /
+                2 sm / 3 lg) so each device downloads the right width. */}
+            <Image
               src={product.primaryImageUrl}
               alt={product.name}
-              className="size-full object-cover"
+              fill
+              sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+              className="object-cover"
             />
           </div>
         ) : (
