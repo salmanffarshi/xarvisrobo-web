@@ -5,3 +5,11 @@ allowBuilds:
   prisma: true
   sharp: true
   unrs-resolver: true
+
+# Force a patched PostCSS everywhere (Phase J.3 Part C). next 15.5.x bundles
+# postcss 8.4.31, which has GHSA-qx2v-qp2m-jg93 (moderate, XSS via unescaped
+# </style> in stringify). Build-time only and not exploitable in our usage (we
+# never run PostCSS on untrusted input), but this minor bump (8.4→8.5) closes it
+# with no breaking change.
+overrides:
+  postcss: '>=8.5.10'
