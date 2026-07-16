@@ -1,8 +1,19 @@
+import { Geist_Mono } from "next/font/google";
+
 import { signOut } from "@/auth";
 import { Badge } from "@/components/ui/badge";
 import { requireStaffPage } from "@/lib/auth-guards";
 import { AdminMobileBar } from "./admin-mobile-bar";
 import { AdminNav } from "./admin-nav";
+
+// Geist Mono is scoped to the admin dashboard (coupon codes use font-mono).
+// Loading it here rather than in the root layout keeps the ~26 KB font file
+// off every customer-facing page. The `--font-geist-mono` variable is applied
+// to the shell below; globals.css maps `--font-mono` → `--font-geist-mono`.
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
 // Admin shell — wraps every staff dashboard route (/admin, and later
 // /admin/orders, /admin/products, ...). Lives in the (dashboard) route group so
@@ -47,7 +58,7 @@ export default async function AdminDashboardLayout({
   );
 
   return (
-    <div className="bg-muted/30 flex min-h-screen">
+    <div className={`${geistMono.variable} bg-muted/30 flex min-h-screen`}>
       {/* Desktop sidebar — sticky, full-height dashboard chrome. */}
       <aside className="bg-card hidden w-64 shrink-0 flex-col border-r lg:sticky lg:top-0 lg:flex lg:h-screen">
         <div className="border-b px-6 py-5 text-lg font-semibold tracking-tight">
