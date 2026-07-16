@@ -727,3 +727,74 @@ gate (no Manufacturing row, PENDING payment). No P2028, no 500s.
 Neon's pooled (`-pooler`) endpoint with `pgbouncer=true` if connection
 contention recurs. This is compounding-latency insurance only — (b)+(c) are the
 actual cure.
+
+---
+
+## ADR-020: Rate limiting — Postgres fixed-window, fail-open, dual ip+email keys on the sensitive auth surfaces
+
+**Date:** 2026-07-16 (Phase J.3 Part A)
+
+**Decision:** Rate limiting is a single Postgres table (`RateLimit`: `key` PK,
+`count`, `expiresAt`) driven by `src/lib/rate-limit.ts`, applied to the auth,
+password-reset, coupon-validate, contact, and customer-upload surfaces. No Redis,
+no external service — one table reused everywhere (including the Part D error-alert
+throttle).
+
+**Algorithm — fixed window.** Each `key` owns one row with a `count` and the
+window's `expiresAt`. The increment is a SINGLE atomic
+`INSERT … ON CONFLICT DO UPDATE` that increments-or-resets and RETURNs the new
+count in one round-trip — never read-then-write (which races), so two concurrent
+requests can never both slip past the limit. Fixed window can allow up to ~2× the
+limit across a window boundary; accepted — the goal is stopping brute force and
+abuse, not precise metering, and sliding-window/token-bucket cost materially more
+for no launch benefit.
+
+**Fail-OPEN.** Every limiter DB call is wrapped so that on ANY error it ALLOWS the
+request and logs. A rate limiter must never become the outage — a Neon blip or
+pool timeout must not lock everyone out of a live store. (Verified: with the table
+renamed away, all requests were allowed, not 429/500, and logged.)
+
+**Per-endpoint limits** (generous for humans, tight on abuse), 429 + `Retry-After`,
+generic body (never reveals whether an account/coupon/email exists):
+
+| Surface | Key(s) | Limit |
+|---|---|---|
+| Admin login | ip AND email | 5 / 15 min |
+| Customer login | ip | 10 / 15 min |
+| Register | ip | 5 / hour |
+| forgot-password | ip AND email | 3 / hour |
+| reset-password | ip | 10 / hour |
+| coupons/validate | userId | 20 / hour |
+| Contact | ip | 5 / hour |
+| Payment-proof submit | userId | 10 / hour |
+| Payment-proof Cloudinary sign | userId | 30 / hour |
+| Order placement | — | none (idempotency already prevents double-orders; blocking a real order is a lost sale) |
+
+**Dual ip+email on forgot-password AND admin login (both keys must pass).**
+IP-only doesn't stop an attacker email-bombing one victim's inbox from many
+addresses, nor a distributed admin brute-force from many IPs — the email key
+closes both. Accepted trade-off: the email key enables a targeted 15-minute
+account-lockout DoS (fail 5× on a known admin email), taken deliberately because
+admin-password brute force (→ change the bKash/Nagad receiving numbers in
+settings → every subsequent customer pays the attacker) is the far worse outcome
+this phase exists to prevent.
+
+**Login is Auth.js, not a `/api/v1` route,** so limiting lives in a WRAPPER around
+the credentials-callback `POST` (`src/app/api/auth/[...nextauth]/route.ts`): PEEK
+the limit before delegating (a real 429 + Retry-After), then record only FAILED
+attempts (no session cookie set) — so a legitimate admin's successful logins never
+consume budget, while an attacker's failed guesses are capped. The wrapper reads
+the body once and reconstructs a `NextRequest` for Auth.js (cloning + reading a
+Request body is unreliable — it can lock the original stream), and is fail-open:
+any wrapper error falls through to the normal handler.
+
+**Client IP on Vercel:** the leftmost entry of `x-forwarded-for` (Vercel puts the
+real client there), falling back to `x-real-ip`, then a constant bucket.
+
+**Cleanup:** ~1% of limited requests fire a bounded, best-effort sweep of expired
+rows so the table can't grow forever.
+
+**Revisit if:** we outgrow one Postgres table (move to Redis/Upstash), need
+sliding-window precision, want Vercel WAF edge rules as a complement (IP-only —
+can't express the email/userId keys, so it complements rather than replaces this),
+or add a per-account temporary-lockout that survives the fixed window.

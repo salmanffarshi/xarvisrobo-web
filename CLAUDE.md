@@ -152,6 +152,7 @@ Update this list as each phase completes. Also append a one-line note to `docs/p
 - [x] Phase H — 2026-07-13 — product features section (admin-managed, ordered) + interactive gallery with Cloudinary image+video
 - [x] Phase I — 2026-07-14 — notifications: customer emails (placed/preparing/shipped/delivered/rejected/cancelled) + admin Telegram (new order, proof submitted); after-commit, best-effort
 - [x] Phase J.1 — 2026-07-14 — floating WhatsApp + Messenger contact buttons (Settings-driven), customer-facing only
+- [x] Phase J.3 — 2026-07-16 — hardening & launch polish: Postgres-backed rate limiting (auth/reset/coupon/contact/upload, dual ip+email on forgot-password + admin login, fail-open — ADR-020), security headers + report-only CSP, dependency/secret/log/access-control audit, throttled Telegram error alerts (onRequestError), OG social previews + product JSON-LD
 
 ## Reference documents
 
