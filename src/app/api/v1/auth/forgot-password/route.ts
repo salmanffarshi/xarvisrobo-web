@@ -7,6 +7,11 @@
 
 import { NextResponse } from "next/server";
 
+import {
+  RATE_LIMITS,
+  enforceRateLimits,
+  getClientIp,
+} from "@/lib/rate-limit";
 import { forgotPasswordSchema } from "@/lib/validations/auth";
 import { requestReset } from "@/services/password-reset-service";
 
@@ -31,6 +36,16 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
+
+  // Rate limit by BOTH ip AND email (both must pass). IP-only wouldn't stop an
+  // attacker email-bombing one victim from many addresses; the email key does.
+  // The 429 is identical whether or not the email exists — enumeration-safe.
+  const email = parsed.data.email.trim().toLowerCase();
+  const limited = await enforceRateLimits([
+    { key: `forgot:ip:${getClientIp(req)}`, ...RATE_LIMITS.forgotPassword },
+    { key: `forgot:email:${email}`, ...RATE_LIMITS.forgotPassword },
+  ]);
+  if (limited) return limited;
 
   try {
     await requestReset(parsed.data.email);

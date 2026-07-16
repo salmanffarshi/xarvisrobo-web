@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 
 import { requireCustomer } from "@/lib/auth-guards";
+import { RATE_LIMITS, enforceRateLimits } from "@/lib/rate-limit";
 import { submitProofSchema } from "@/lib/validations/payment";
 import {
   InvalidScreenshotError,
@@ -19,6 +20,15 @@ export async function POST(
 ) {
   const guard = await requireCustomer();
   if (guard.response) return guard.response;
+
+  // Rate limit by customer id — caps proof-submission abuse per account.
+  const limited = await enforceRateLimits([
+    {
+      key: `payment-proof:user:${guard.session.user.id}`,
+      ...RATE_LIMITS.paymentProof,
+    },
+  ]);
+  if (limited) return limited;
 
   try {
     const { orderNumber } = await params;

@@ -6,11 +6,22 @@
 
 import { NextResponse } from "next/server";
 
+import {
+  RATE_LIMITS,
+  enforceRateLimits,
+  getClientIp,
+} from "@/lib/rate-limit";
 import { contactMessageSchema } from "@/lib/validations/contact";
 import { SpamRejectedError, submitMessage } from "@/services/contact-service";
 
 export async function POST(req: Request) {
   try {
+    // Rate limit by IP — caps contact-form spam floods.
+    const limited = await enforceRateLimits([
+      { key: `contact:ip:${getClientIp(req)}`, ...RATE_LIMITS.contact },
+    ]);
+    if (limited) return limited;
+
     const body = await req.json().catch(() => null);
     if (body === null) {
       return NextResponse.json(

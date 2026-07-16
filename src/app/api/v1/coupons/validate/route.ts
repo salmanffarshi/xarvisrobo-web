@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireCustomer } from "@/lib/auth-guards";
+import { RATE_LIMITS, enforceRateLimits } from "@/lib/rate-limit";
 import { previewCoupon } from "@/services/coupon-service";
 
 const bodySchema = z.object({ code: z.string().trim().min(1).max(40) });
@@ -14,6 +15,16 @@ const bodySchema = z.object({ code: z.string().trim().min(1).max(40) });
 export async function POST(req: Request) {
   const guard = await requireCustomer();
   if (guard.response) return guard.response;
+
+  // Rate limit by customer id — blocks coupon-code enumeration (probing which
+  // codes exist / are valid) from a signed-in account.
+  const limited = await enforceRateLimits([
+    {
+      key: `coupon-validate:user:${guard.session.user.id}`,
+      ...RATE_LIMITS.couponValidate,
+    },
+  ]);
+  if (limited) return limited;
 
   const body = await req.json().catch(() => null);
   const parsed = bodySchema.safeParse(body);

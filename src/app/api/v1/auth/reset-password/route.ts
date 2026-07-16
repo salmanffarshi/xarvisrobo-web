@@ -9,6 +9,11 @@
 
 import { NextResponse } from "next/server";
 
+import {
+  RATE_LIMITS,
+  enforceRateLimits,
+  getClientIp,
+} from "@/lib/rate-limit";
 import { resetPasswordSchema } from "@/lib/validations/auth";
 import {
   InvalidResetTokenError,
@@ -17,6 +22,12 @@ import {
 
 export async function POST(req: Request) {
   try {
+    // Rate limit by IP — caps token-guessing / redemption hammering.
+    const limited = await enforceRateLimits([
+      { key: `reset:ip:${getClientIp(req)}`, ...RATE_LIMITS.resetPassword },
+    ]);
+    if (limited) return limited;
+
     const body = await req.json().catch(() => null);
 
     const parsed = resetPasswordSchema.safeParse(body);

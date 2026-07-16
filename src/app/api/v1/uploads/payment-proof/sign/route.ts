@@ -6,10 +6,21 @@ import { NextResponse } from "next/server";
 
 import { requireCustomer } from "@/lib/auth-guards";
 import { PAYMENT_PROOFS_FOLDER, generateUploadSignature } from "@/lib/cloudinary";
+import { RATE_LIMITS, enforceRateLimits } from "@/lib/rate-limit";
 
 export async function POST() {
   const guard = await requireCustomer();
   if (guard.response) return guard.response;
+
+  // Rate limit by customer id — a signature mints direct Cloudinary upload
+  // access, so cap how many a single account can request per hour.
+  const limited = await enforceRateLimits([
+    {
+      key: `cloudinary-sign:user:${guard.session.user.id}`,
+      ...RATE_LIMITS.cloudinarySign,
+    },
+  ]);
+  if (limited) return limited;
 
   return NextResponse.json(generateUploadSignature(PAYMENT_PROOFS_FOLDER));
 }

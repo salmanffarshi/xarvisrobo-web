@@ -49,6 +49,9 @@ export default function AdminLoginPage() {
     if (result?.ok) {
       router.push("/admin");
       router.refresh();
+    } else if (result?.status === 429) {
+      // Rate limited (Phase J.3) — generic, reveals nothing about the account.
+      setServerError("Too many attempts. Please wait a few minutes and try again.");
     } else {
       setServerError("Invalid credentials.");
     }

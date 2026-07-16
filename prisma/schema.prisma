@@ -572,3 +572,22 @@ model CouponRedemption {
   @@index([couponId, userId])
   @@index([couponId])
 }
+
+// ============================================================================
+// RATE LIMITING (Phase J.3)
+// ============================================================================
+
+// One row per fixed-window rate-limit bucket. The `key` encodes the scope and
+// window, e.g. "admin-login:ip:1.2.3.4" or "forgot:email:a@b.com". `count` is
+// the number of requests seen in the CURRENT window; `expiresAt` is when that
+// window ends (and the row becomes reclaimable). Increment is a single atomic
+// upsert (INSERT … ON CONFLICT DO UPDATE) so concurrent requests can't race
+// past the limit — see src/lib/rate-limit.ts. The @@index on expiresAt lets the
+// opportunistic cleanup sweep delete a small batch of expired rows cheaply.
+model RateLimit {
+  key       String   @id
+  count     Int      @default(0)
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}

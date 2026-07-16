@@ -67,6 +67,9 @@ function LoginForm() {
       await mergeGuestCartOnAuth();
       router.push(callbackUrl);
       router.refresh();
+    } else if (result?.status === 429) {
+      // Rate limited (Phase J.3). Generic — never reveals whether the email exists.
+      setServerError("Too many attempts. Please wait a few minutes and try again.");
     } else {
       // Never reveal whether the email exists — always the same message.
       setServerError("Invalid email or password.");

@@ -8,6 +8,11 @@ import { NextResponse } from "next/server";
 
 import { registerSchema } from "@/lib/validations/auth";
 import {
+  RATE_LIMITS,
+  enforceRateLimits,
+  getClientIp,
+} from "@/lib/rate-limit";
+import {
   EmailTakenError,
   PhoneTakenError,
   registerCustomer,
@@ -15,6 +20,12 @@ import {
 
 export async function POST(req: Request) {
   try {
+    // Rate limit by IP — caps account-creation abuse from a single source.
+    const limited = await enforceRateLimits([
+      { key: `register:ip:${getClientIp(req)}`, ...RATE_LIMITS.register },
+    ]);
+    if (limited) return limited;
+
     const body = await req.json().catch(() => null);
     if (body === null) {
       return NextResponse.json(
