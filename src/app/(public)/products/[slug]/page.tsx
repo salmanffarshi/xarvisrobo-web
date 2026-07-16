@@ -6,6 +6,7 @@ import { AddToCartButton } from "@/components/product/add-to-cart-button";
 import { ProductGallery } from "@/components/product/product-gallery";
 import { RobotPlaceholder } from "@/components/product/robot-placeholder";
 import { Badge } from "@/components/ui/badge";
+import { ogImageUrl } from "@/lib/cloudinary-url";
 import { formatBdt } from "@/lib/format";
 import { normalizeFeatures } from "@/lib/product-features";
 import { normalizeSpecs } from "@/lib/product-specs";
@@ -13,22 +14,49 @@ import * as productService from "@/services/product-service";
 
 type Props = { params: Promise<{ slug: string }> };
 
+type ProductImage = { url: string; type: "IMAGE" | "VIDEO"; isPrimary: boolean };
+
+// The lead image for social cards / structured data: the primary IMAGE if one
+// is flagged, else the first IMAGE. Videos are never used (need a still frame).
+function primaryImageUrl(images: ProductImage[]): string | null {
+  const imageOnly = images.filter((m) => m.type === "IMAGE");
+  const primary = imageOnly.find((m) => m.isPrimary) ?? imageOnly[0];
+  return primary ? primary.url : null;
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const product = await productService.getBySlug(slug);
   if (!product) return {};
 
+  const description = product.shortDescription ?? undefined;
+  const lead = primaryImageUrl(product.images);
+  // A 1200×630 OG derivative when the product has an image; otherwise omit
+  // `images` so the site-wide default OG image (root layout) is inherited.
+  const ogImages = lead
+    ? [{ url: ogImageUrl(lead), width: 1200, height: 630, alt: product.name }]
+    : undefined;
+
   return {
     title: product.name,
-    description: product.shortDescription ?? undefined,
+    description,
     openGraph: {
-      title: `${product.name} — Xarvisrobo`,
-      description: product.shortDescription ?? undefined,
-      url: `/products/${product.slug}`,
-      siteName: "Xarvisrobo",
-      locale: "en_US",
       type: "website",
+      title: `${product.name} — Xarvisrobo`,
+      description,
+      url: `/products/${product.slug}`,
+      ...(ogImages ? { images: ogImages } : {}),
     },
+    ...(lead
+      ? {
+          twitter: {
+            card: "summary_large_image",
+            title: `${product.name} — Xarvisrobo`,
+            description,
+            images: [ogImageUrl(lead)],
+          },
+        }
+      : {}),
   };
 }
 
@@ -43,8 +71,46 @@ export default async function ProductDetailPage({ params }: Props) {
   // Ordered { title, description }[] feature highlights (Phase H #6).
   const features = normalizeFeatures(product.features);
 
+  // schema.org Product structured data (Phase J.3 Part E). Only claims what we
+  // actually have: offers appear only when a real price is set (never a
+  // fabricated price/availability), and there is no aggregateRating (no reviews
+  // in v1). Availability reflects real stock.
+  const lead = primaryImageUrl(product.images);
+  const jsonLd: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: product.shortDescription ?? product.description,
+    sku: product.sku,
+    brand: { "@type": "Brand", name: "Xarvisrobo" },
+    ...(lead ? { image: [ogImageUrl(lead)] } : {}),
+    ...(isPriceTbd
+      ? {}
+      : {
+          offers: {
+            "@type": "Offer",
+            price: product.basePrice,
+            priceCurrency: "BDT",
+            availability:
+              product.stockQuantity > 0
+                ? "https://schema.org/InStock"
+                : "https://schema.org/PreOrder",
+            url: `https://xarvisrobo.com/products/${product.slug}`,
+          },
+        }),
+  };
+
   return (
     <div className="mx-auto max-w-6xl px-6 py-16 sm:py-24">
+      {/* Product structured data. JSON.stringify's `<` is escaped to < so
+          the payload can never break out of the <script> element (XSS-safe). */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c"),
+        }}
+      />
+
       {/* Above the fold: placeholder left (60%), product info right (40%) */}
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-5 lg:gap-16">
         <div className="lg:col-span-3">

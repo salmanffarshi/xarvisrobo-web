@@ -9,15 +9,9 @@ import * as productService from "@/services/product-service";
 export const metadata: Metadata = {
   description:
     "Xarvisrobo builds intelligent desk companions — designed in Bangladesh, built for everyone.",
-  openGraph: {
-    title: "Xarvisrobo",
-    description:
-      "Xarvisrobo builds intelligent desk companions — designed in Bangladesh, built for everyone.",
-    url: "/",
-    siteName: "Xarvisrobo",
-    locale: "en_US",
-    type: "website",
-  },
+  // OpenGraph/Twitter (incl. the default social image) are inherited from the
+  // root layout. We intentionally don't re-declare openGraph here: Next shallow-
+  // merges it, so a partial override would drop the inherited default image.
 };
 
 const PILLARS = [

@@ -32,3 +32,9 @@ export function videoPosterUrl(url: string): string {
   const framed = withTransform(url, "so_0,f_auto,q_auto,w_600,h_600,c_fill");
   return framed.replace(/\.(mp4|webm|mov)$/i, ".jpg");
 }
+
+/** A 1200×630 social-preview (Open Graph / Twitter) derivative of a product
+ * image — the standard OG card ratio, centre-cropped with smart gravity. */
+export function ogImageUrl(url: string): string {
+  return withTransform(url, "f_auto,q_auto,w_1200,h_630,c_fill,g_auto");
+}
