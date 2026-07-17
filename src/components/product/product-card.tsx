@@ -14,7 +14,7 @@ export function ProductCard({ product }: { product: ProductCardData }) {
   return (
     <Link
       href={`/products/${product.slug}`}
-      className="group block rounded-2xl border border-neutral-200 bg-white transition-transform hover:-translate-y-0.5 hover:shadow-md"
+      className="group block rounded-2xl border border-neutral-200/70 bg-white shadow-soft transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-1 hover:border-neutral-300 hover:shadow-elevated"
     >
       <div className="relative p-3">
         {product.primaryImageUrl ? (
@@ -28,32 +28,36 @@ export function ProductCard({ product }: { product: ProductCardData }) {
               alt={product.name}
               fill
               sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-              className="object-cover"
+              className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
             />
           </div>
         ) : (
-          <RobotPlaceholder
-            slug={product.slug}
-            name={product.name}
-            variant="card"
-          />
+          <div className="overflow-hidden rounded-xl">
+            <div className="transition-transform duration-500 ease-out group-hover:scale-[1.03]">
+              <RobotPlaceholder
+                slug={product.slug}
+                name={product.name}
+                variant="card"
+              />
+            </div>
+          </div>
         )}
         {product.isFeatured && (
-          <Badge className="absolute right-5 top-5">Featured</Badge>
+          <Badge className="absolute right-5 top-5 shadow-sm">Featured</Badge>
         )}
       </div>
       <div className="px-5 pb-5 pt-1">
-        <h3 className="font-medium tracking-tight text-neutral-900">
+        <h3 className="font-medium tracking-tight text-neutral-900 transition-colors group-hover:text-primary">
           {product.name}
         </h3>
         <p className="mt-1 line-clamp-2 text-sm text-neutral-600">
           {product.shortDescription}
         </p>
-        <div className="mt-3 flex items-baseline justify-between">
-          <span className="font-medium tabular-nums text-neutral-900">
+        <div className="mt-4 flex items-baseline justify-between border-t border-neutral-100 pt-4">
+          <span className="font-semibold tabular-nums text-neutral-900">
             {isPriceTbd ? "TBD — pre-order" : formatBdt(product.basePrice)}
           </span>
-          <span className="text-xs text-neutral-500">
+          <span className="text-xs font-medium text-neutral-500">
             {product.stockQuantity > 0 ? "In stock" : "Pre-order"}
           </span>
         </div>

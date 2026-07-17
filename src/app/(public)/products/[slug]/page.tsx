@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Check } from "lucide-react";
 
 import { AddToCartButton } from "@/components/product/add-to-cart-button";
 import { ProductGallery } from "@/components/product/product-gallery";
@@ -125,31 +126,32 @@ export default async function ProductDetailPage({ params }: Props) {
           )}
         </div>
 
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 lg:pt-4">
           <Link
             href={`/products?category=${product.category.slug}`}
-            className="text-sm text-neutral-600 underline-offset-4 hover:underline"
+            className="text-eyebrow inline-block hover:opacity-80"
           >
             {product.category.name}
           </Link>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-neutral-900 lg:text-5xl">
+          <h1 className="mt-4 text-4xl font-semibold tracking-tight text-neutral-900 lg:text-5xl">
             {product.name}
           </h1>
           {product.shortDescription && (
-            <p className="mt-4 text-lg text-neutral-600">
+            <p className="mt-4 text-lg leading-relaxed text-neutral-600">
               {product.shortDescription}
             </p>
           )}
 
-          <p className="mt-6 text-2xl font-medium tabular-nums text-neutral-900">
-            {isPriceTbd
-              ? "Pricing announced at pre-order"
-              : formatBdt(product.basePrice)}
-          </p>
-
-          <Badge variant="secondary" className="mt-3">
-            {product.stockQuantity > 0 ? "In stock" : "Pre-order"}
-          </Badge>
+          <div className="mt-8 flex items-center gap-3">
+            <p className="text-3xl font-semibold tabular-nums text-neutral-900">
+              {isPriceTbd
+                ? "Pricing at pre-order"
+                : formatBdt(product.basePrice)}
+            </p>
+            <Badge variant="secondary">
+              {product.stockQuantity > 0 ? "In stock" : "Pre-order"}
+            </Badge>
+          </div>
 
           <div className="mt-8">
             <AddToCartButton productId={product.id} />
@@ -163,6 +165,27 @@ export default async function ProductDetailPage({ params }: Props) {
               </Link>
             </p>
           </div>
+
+          {/* Considered trust points — brand facts already true across the site. */}
+          <ul className="mt-8 space-y-3 border-t border-neutral-200 pt-8">
+            {[
+              "Modular, upgradable platform",
+              "Covered by the Xarvisrobo warranty",
+              "Designed & built in Bangladesh",
+            ].map((point) => (
+              <li
+                key={point}
+                className="flex items-center gap-3 text-sm text-neutral-700"
+              >
+                <Check
+                  className="size-4 shrink-0 text-primary"
+                  strokeWidth={2.25}
+                  aria-hidden
+                />
+                {point}
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, PackageOpen } from "lucide-react";
 
 import { ProductCard } from "@/components/product/product-card";
 import { ProductFilters } from "@/components/product/product-filters";
@@ -55,15 +55,14 @@ export default async function ProductsPage({
   );
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-16 sm:py-24">
-      <h1 className="text-4xl font-semibold tracking-tight text-neutral-900 md:text-5xl">
-        Robots
-      </h1>
-      <p className="mt-4 text-lg text-neutral-600">
+    <div className="container-page py-16 sm:py-24">
+      <p className="text-eyebrow">Catalog</p>
+      <h1 className="text-display mt-3">Robots</h1>
+      <p className="text-lead mt-4">
         Small robots designed for real desks. Meet ours below.
       </p>
 
-      <div className="mt-10">
+      <div className="mt-10 border-t border-neutral-200 pt-6">
         <ProductFilters
           categories={categories.map(({ slug, name, productCount }) => ({
             slug,
@@ -75,27 +74,45 @@ export default async function ProductsPage({
       </div>
 
       {result.data.length > 0 ? (
-        <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
-          {result.data.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+        <>
+          <p className="mt-8 text-sm text-neutral-500">
+            {result.total} {result.total === 1 ? "robot" : "robots"}
+          </p>
+          <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
+            {result.data.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        </>
       ) : (
-        <div className="mt-24 text-center">
+        <div className="mt-16 flex flex-col items-center rounded-2xl border border-dashed border-neutral-200 bg-neutral-50/50 px-6 py-20 text-center">
+          <span className="flex size-14 items-center justify-center rounded-2xl bg-white text-neutral-400 shadow-soft">
+            <PackageOpen className="size-7" strokeWidth={1.5} aria-hidden />
+          </span>
           {hasActiveFilters ? (
             <>
-              <p className="text-lg text-neutral-600">
+              <p className="mt-6 text-lg text-neutral-900">
                 No robots match those filters.
+              </p>
+              <p className="mt-1 text-sm text-neutral-600">
+                Try a different search or category.
               </p>
               <Link
                 href="/products"
-                className="mt-3 inline-block text-sm text-neutral-600 underline underline-offset-4"
+                className="mt-5 text-sm font-medium text-primary underline-offset-4 hover:underline"
               >
                 Clear filters
               </Link>
             </>
           ) : (
-            <p className="text-lg text-neutral-600">Products coming soon.</p>
+            <>
+              <p className="mt-6 text-lg text-neutral-900">
+                Products coming soon.
+              </p>
+              <p className="mt-1 text-sm text-neutral-600">
+                Our first robots are on the way — check back shortly.
+              </p>
+            </>
           )}
         </div>
       )}

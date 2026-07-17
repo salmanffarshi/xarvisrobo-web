@@ -41,26 +41,26 @@ export default async function HomePage() {
       <section className="relative overflow-hidden">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_0%,rgb(59_130_246/0.06),transparent)]"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_-5%,rgb(59_130_246/0.08),transparent)]"
         />
-        <div className="relative mx-auto max-w-6xl px-6 py-24 text-center sm:py-32">
-          <h1 className="mx-auto max-w-4xl text-5xl font-semibold tracking-tight text-neutral-900 md:text-7xl">
+        <div className="container-page relative py-24 text-center sm:py-32">
+          <p className="text-eyebrow">Desk robotics, from Bangladesh</p>
+          <h1 className="text-display mx-auto mt-5 max-w-4xl lg:text-7xl">
             Robots designed to belong on your desk.
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-neutral-600 md:text-xl">
+          <p className="text-lead mx-auto mt-6 max-w-2xl">
             Xarvisrobo builds intelligent desk companions — designed in
             Bangladesh, built for everyone.
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            {/* /products 404s until B.2 ships the catalog — expected. */}
             <Button asChild size="lg" className="rounded-full px-8">
               <Link href="/products">Explore robots</Link>
             </Button>
             <Button
               asChild
               size="lg"
-              variant="ghost"
-              className="rounded-xl text-neutral-700"
+              variant="outline"
+              className="rounded-full px-8"
             >
               <Link href="/about">Read our story</Link>
             </Button>
@@ -69,21 +69,26 @@ export default async function HomePage() {
       </section>
 
       {/* What we're building */}
-      <section className="mx-auto max-w-6xl px-6 py-24 sm:py-32">
-        <h2 className="text-3xl font-semibold tracking-tight text-neutral-900 md:text-4xl">
+      <section className="container-page section-py">
+        <p className="text-eyebrow">What we&rsquo;re building</p>
+        <h2 className="text-h2 mt-3 max-w-2xl">
           Three ideas we&rsquo;re building around.
         </h2>
         <div className="mt-12 grid gap-6 md:grid-cols-3">
-          {PILLARS.map((pillar) => (
-            <div key={pillar.title} className="rounded-2xl bg-neutral-50 p-8">
-              <pillar.icon
-                className="size-9 text-primary"
-                strokeWidth={1.5}
-                aria-hidden
-              />
-              <h3 className="mt-6 text-lg font-medium tracking-tight text-neutral-900">
-                {pillar.title}
-              </h3>
+          {PILLARS.map((pillar, i) => (
+            <div
+              key={pillar.title}
+              className="group rounded-2xl border border-neutral-200/70 bg-white p-8 shadow-soft transition-shadow duration-200 hover:shadow-elevated"
+            >
+              <div className="flex items-center justify-between">
+                <span className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <pillar.icon className="size-6" strokeWidth={1.5} aria-hidden />
+                </span>
+                <span className="text-sm font-medium tabular-nums text-neutral-300">
+                  0{i + 1}
+                </span>
+              </div>
+              <h3 className="mt-6 text-h3">{pillar.title}</h3>
               <p className="mt-3 text-sm leading-relaxed text-neutral-600">
                 {pillar.body}
               </p>
@@ -93,37 +98,51 @@ export default async function HomePage() {
       </section>
 
       {/* Featured products */}
-      <section className="mx-auto max-w-6xl px-6 py-24 sm:py-32">
-        <h2 className="text-3xl font-semibold tracking-tight text-neutral-900 md:text-4xl">
-          The robots we&rsquo;re building.
-        </h2>
-        <p className="mt-4 text-lg text-neutral-600">
-          Two designs, one philosophy — small, capable, made in Bangladesh.
-        </p>
+      <section className="container-page section-py">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-eyebrow">The lineup</p>
+            <h2 className="text-h2 mt-3">The robots we&rsquo;re building.</h2>
+            <p className="text-lead mt-4">
+              Two designs, one philosophy — small, capable, made in Bangladesh.
+            </p>
+          </div>
+          <Link
+            href="/products"
+            className="group inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
+          >
+            See all robots
+            <span className="transition-transform duration-200 group-hover:translate-x-0.5">
+              →
+            </span>
+          </Link>
+        </div>
         <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:gap-8">
           {featured.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
         </div>
-        <Link
-          href="/products"
-          className="mt-8 inline-block text-sm text-neutral-600 underline-offset-4 hover:underline"
-        >
-          See all robots →
-        </Link>
       </section>
 
-      {/* Closing CTA */}
-      <section className="mx-auto max-w-6xl px-6 py-16 pb-24 text-center sm:pb-32">
-        <h2 className="text-3xl font-semibold tracking-tight text-neutral-900 md:text-4xl">
-          Curious about what we&rsquo;re making?
-        </h2>
-        <p className="mt-4 text-lg text-neutral-600">
-          We&rsquo;d love to hear from you.
-        </p>
-        <Button asChild size="lg" className="mt-8 rounded-full px-8">
-          <Link href="/contact">Get in touch</Link>
-        </Button>
+      {/* Closing CTA — a designed band, not plain centered text. */}
+      <section className="container-page pb-24 pt-4 sm:pb-32">
+        <div className="relative overflow-hidden rounded-3xl border border-neutral-200/70 bg-neutral-50 px-6 py-16 text-center sm:py-20">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_60%_at_50%_0%,rgb(59_130_246/0.08),transparent)]"
+          />
+          <div className="relative">
+            <h2 className="text-h2 mx-auto max-w-xl">
+              Curious about what we&rsquo;re making?
+            </h2>
+            <p className="text-lead mx-auto mt-4 max-w-lg">
+              We&rsquo;d love to hear from you.
+            </p>
+            <Button asChild size="lg" className="mt-8 rounded-full px-8">
+              <Link href="/contact">Get in touch</Link>
+            </Button>
+          </div>
+        </div>
       </section>
     </>
   );

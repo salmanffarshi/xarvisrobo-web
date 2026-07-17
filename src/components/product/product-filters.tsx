@@ -105,7 +105,11 @@ export function ProductFilters({ categories, filters }: ProductFiltersProps) {
             >
               <Badge
                 variant={isActive ? "default" : "outline"}
-                className="cursor-pointer px-3 py-1"
+                className={
+                  isActive
+                    ? "cursor-pointer px-3 py-1"
+                    : "cursor-pointer px-3 py-1 transition-colors hover:border-neutral-300 hover:bg-neutral-50"
+                }
               >
                 {category.name} ({category.productCount})
               </Badge>
