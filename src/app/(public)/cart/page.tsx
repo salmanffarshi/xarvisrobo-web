@@ -118,7 +118,7 @@ export default function CartPage() {
           </ul>
 
           <div className="lg:col-span-1">
-            <div className="rounded-2xl bg-neutral-50 p-6 lg:sticky lg:top-24">
+            <div className="rounded-2xl border border-neutral-200/70 bg-neutral-50 p-6 shadow-soft lg:sticky lg:top-24">
               <h2 className="font-medium tracking-tight text-neutral-900">
                 Order summary
               </h2>

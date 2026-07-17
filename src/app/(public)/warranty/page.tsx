@@ -18,10 +18,9 @@ export const metadata: Metadata = {
 export default function WarrantyPage() {
   return (
     <article className="mx-auto max-w-3xl px-6 py-24 sm:py-32">
-      <h1 className="text-4xl font-semibold tracking-tight text-neutral-900 md:text-5xl">
-        Warranty
-      </h1>
-      <p className="mt-6 text-lg leading-relaxed text-neutral-700">
+      <p className="text-eyebrow">Warranty</p>
+      <h1 className="text-display mt-3">Warranty</h1>
+      <p className="text-lead mt-5">
         Every Xarvisrobo device is covered by a twelve-month limited warranty
         starting from the date of delivery. Here&rsquo;s what that covers.
       </p>

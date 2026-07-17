@@ -52,7 +52,7 @@ export function AccountNav() {
             className={cn(
               "flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-colors",
               isActive
-                ? "bg-blue-50 text-blue-600"
+                ? "bg-primary/10 text-primary"
                 : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
             )}
           >

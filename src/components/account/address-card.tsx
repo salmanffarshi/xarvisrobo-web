@@ -83,7 +83,7 @@ export function AddressCard({ address }: { address: AddressData }) {
       <div className="flex items-center gap-2">
         <h3 className="font-medium">{address.label}</h3>
         {address.isDefault && (
-          <Badge className="bg-blue-50 text-blue-600" variant="secondary">
+          <Badge className="bg-primary/10 text-primary" variant="secondary">
             Default
           </Badge>
         )}
@@ -156,7 +156,7 @@ export function AddressCard({ address }: { address: AddressData }) {
           <Button
             variant="ghost"
             size="sm"
-            className="rounded-full text-blue-600 hover:text-blue-600"
+            className="rounded-full text-primary hover:text-primary"
             onClick={handleSetDefault}
             disabled={isWorking}
           >

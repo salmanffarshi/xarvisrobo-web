@@ -32,23 +32,23 @@ const SECTIONS = [
 
 export default function AboutPage() {
   return (
-    <>
-      <section className="mx-auto max-w-3xl px-6 pt-24 sm:pt-32">
-        <h1 className="text-4xl font-semibold tracking-tight text-neutral-900 md:text-5xl">
-          About Xarvisrobo
-        </h1>
-      </section>
+    <div className="mx-auto max-w-3xl px-6 py-24 sm:py-32">
+      <p className="text-eyebrow">About</p>
+      <h1 className="text-display mt-3">About Xarvisrobo</h1>
 
-      {SECTIONS.map((section) => (
-        <section key={section.heading} className="mx-auto max-w-3xl px-6 py-24">
-          <h2 className="text-3xl font-semibold tracking-tight text-neutral-900 md:text-4xl">
-            {section.heading}
-          </h2>
-          <p className="mt-6 text-lg leading-relaxed text-neutral-700">
-            {section.body}
-          </p>
-        </section>
-      ))}
-    </>
+      <div className="mt-16 space-y-16">
+        {SECTIONS.map((section, i) => (
+          <section
+            key={section.heading}
+            className={i > 0 ? "border-t border-neutral-200 pt-16" : undefined}
+          >
+            <h2 className="text-h2">{section.heading}</h2>
+            <p className="mt-5 text-lg leading-relaxed text-neutral-700">
+              {section.body}
+            </p>
+          </section>
+        ))}
+      </div>
+    </div>
   );
 }

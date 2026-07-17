@@ -42,7 +42,7 @@ export default async function AccountOverviewPage() {
           <p className="mt-1 text-sm text-neutral-600">{profile.email}</p>
           <Link
             href="/account/profile"
-            className="mt-4 inline-block text-sm font-medium text-blue-600 hover:underline"
+            className="mt-4 inline-block text-sm font-medium text-primary underline-offset-4 hover:underline"
           >
             Edit profile
           </Link>
@@ -60,7 +60,7 @@ export default async function AccountOverviewPage() {
           </p>
           <Link
             href="/account/addresses"
-            className="mt-4 inline-block text-sm font-medium text-blue-600 hover:underline"
+            className="mt-4 inline-block text-sm font-medium text-primary underline-offset-4 hover:underline"
           >
             Manage addresses
           </Link>
@@ -78,7 +78,7 @@ export default async function AccountOverviewPage() {
           </p>
           <Link
             href="/account/orders"
-            className="mt-4 inline-block text-sm font-medium text-blue-600 hover:underline"
+            className="mt-4 inline-block text-sm font-medium text-primary underline-offset-4 hover:underline"
           >
             View orders
           </Link>

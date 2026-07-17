@@ -29,20 +29,23 @@ const FOOTER_COLUMNS = [
 export function SiteFooter() {
   return (
     <footer className="border-t border-neutral-200 bg-neutral-50">
-      <div className="mx-auto max-w-6xl px-6 py-16">
-        <div className="grid gap-10 md:grid-cols-4">
-          <div>
-            <p className="text-lg font-semibold tracking-tight text-neutral-900">
+      <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
+        <div className="grid gap-12 md:grid-cols-4 md:gap-8">
+          <div className="md:pr-8">
+            <Link
+              href="/"
+              className="text-lg font-semibold tracking-tight text-neutral-900 transition-opacity hover:opacity-70"
+            >
               Xarvisrobo
-            </p>
-            <p className="mt-3 max-w-xs text-sm leading-relaxed text-neutral-600">
+            </Link>
+            <p className="mt-4 max-w-xs text-sm leading-relaxed text-neutral-600">
               Robots designed to belong on your desk.
             </p>
           </div>
 
           {FOOTER_COLUMNS.map((column) => (
             <div key={column.heading}>
-              <p className="text-sm font-medium text-neutral-900">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-400">
                 {column.heading}
               </p>
               <ul className="mt-4 flex flex-col gap-3">
@@ -61,9 +64,12 @@ export function SiteFooter() {
           ))}
         </div>
 
-        <div className="mt-16 border-t border-neutral-200 pt-8">
+        <div className="mt-16 flex flex-col gap-2 border-t border-neutral-200 pt-8 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-neutral-500">
-            © 2026 Xarvisrobo. Designed and built in Bangladesh.
+            © 2026 Xarvisrobo. All rights reserved.
+          </p>
+          <p className="text-sm text-neutral-500">
+            Designed &amp; built in Bangladesh.
           </p>
         </div>
       </div>

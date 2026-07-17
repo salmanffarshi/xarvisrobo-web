@@ -58,10 +58,9 @@ const FAQ_ITEMS = [
 export default function FaqPage() {
   return (
     <section className="mx-auto max-w-3xl px-6 py-24 sm:py-32">
-      <h1 className="text-4xl font-semibold tracking-tight text-neutral-900 md:text-5xl">
-        Frequently asked questions
-      </h1>
-      <p className="mt-4 text-lg text-neutral-600">
+      <p className="text-eyebrow">FAQ</p>
+      <h1 className="text-display mt-3">Frequently asked questions</h1>
+      <p className="text-lead mt-4">
         Answers to the things people ask most. If you don&rsquo;t see yours
         here, our contact page is the fastest way to reach us.
       </p>

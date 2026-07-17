@@ -5,11 +5,11 @@ import { isCustomer } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { CartButton } from "@/components/cart/cart-button";
 import { AccountMenu } from "@/components/layout/account-menu";
+import { HeaderNavLinks } from "@/components/layout/header-nav-links";
 import {
   MobileNav,
   type HeaderAuthState,
 } from "@/components/layout/mobile-nav";
-import { NAV_LINKS } from "@/components/layout/nav-links";
 
 // Sticky glassmorphism header. Server component: it reads the session once
 // per request via auth() (JWT decode, no DB hit — ADR-014) and passes plain
@@ -24,26 +24,16 @@ export async function SiteHeader() {
       : { status: "staff" };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-neutral-200/60 bg-white/70 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-neutral-200/60 bg-white/70 backdrop-blur-md supports-[backdrop-filter]:bg-white/60">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
         <Link
           href="/"
-          className="text-lg font-semibold tracking-tight text-neutral-900"
+          className="text-lg font-semibold tracking-tight text-neutral-900 transition-opacity hover:opacity-70"
         >
           Xarvisrobo
         </Link>
 
-        <nav className="hidden items-center gap-8 md:flex">
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="text-sm text-neutral-600 transition-colors duration-200 hover:text-neutral-900"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
+        <HeaderNavLinks />
 
         <div className="flex items-center gap-1 md:gap-3">
           <CartButton />

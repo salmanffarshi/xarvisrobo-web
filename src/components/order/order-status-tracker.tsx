@@ -19,15 +19,15 @@ import type { OrderStatus, PaymentMethod } from "@prisma/client";
 function StepNode({ state }: { state: StepState }) {
   if (state === "complete") {
     return (
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
         <Check className="size-4" strokeWidth={1.5} aria-hidden />
       </span>
     );
   }
   if (state === "current") {
     return (
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white ring-2 ring-blue-600">
-        <span className="size-2.5 rounded-full bg-blue-600" aria-hidden />
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white ring-2 ring-primary">
+        <span className="size-2.5 rounded-full bg-primary" aria-hidden />
       </span>
     );
   }
@@ -50,7 +50,7 @@ function labelClasses(state: StepState): string {
 // A connector segment reads "done" (blue) once the step it leads out of is
 // complete, otherwise it's a neutral track.
 function connectorClasses(fromState: StepState): string {
-  return fromState === "complete" ? "bg-blue-600" : "bg-neutral-200";
+  return fromState === "complete" ? "bg-primary" : "bg-neutral-200";
 }
 
 export function OrderStatusTracker({

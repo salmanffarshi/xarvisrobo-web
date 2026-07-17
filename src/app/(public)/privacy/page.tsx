@@ -30,9 +30,8 @@ const SECTIONS = [
 export default function PrivacyPage() {
   return (
     <article className="mx-auto max-w-3xl px-6 py-24 sm:py-32">
-      <h1 className="text-4xl font-semibold tracking-tight text-neutral-900 md:text-5xl">
-        Privacy Policy
-      </h1>
+      <p className="text-eyebrow">Legal</p>
+      <h1 className="text-display mt-3">Privacy Policy</h1>
 
       <div className="mt-8">
         <PlaceholderBanner />

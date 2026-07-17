@@ -2,7 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
+
+import { cn } from "@/lib/utils";
 
 import {
   Sheet,
@@ -28,6 +31,7 @@ export type HeaderAuthState =
 export function MobileNav({ authState }: { authState: HeaderAuthState }) {
   const [open, setOpen] = React.useState(false);
   const close = () => setOpen(false);
+  const pathname = usePathname();
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -45,16 +49,26 @@ export function MobileNav({ authState }: { authState: HeaderAuthState }) {
         </SheetHeader>
 
         <nav className="flex flex-col gap-1 px-4">
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              onClick={close}
-              className="rounded-xl px-3 py-2.5 text-base text-neutral-600 transition-colors duration-200 hover:bg-neutral-50 hover:text-neutral-900"
-            >
-              {link.label}
-            </Link>
-          ))}
+          {NAV_LINKS.map((link) => {
+            const isActive =
+              pathname === link.href || pathname.startsWith(`${link.href}/`);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={close}
+                aria-current={isActive ? "page" : undefined}
+                className={cn(
+                  "rounded-xl px-3 py-2.5 text-base transition-colors duration-200",
+                  isActive
+                    ? "bg-primary/10 font-medium text-primary"
+                    : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
+                )}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
         </nav>
 
         <Separator className="mx-4 w-auto bg-neutral-100" />
